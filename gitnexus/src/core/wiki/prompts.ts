@@ -1,13 +1,15 @@
 /**
  * LLM Prompt Templates for Wiki Generation
- * 
+ *
  * All prompts produce deterministic, source-grounded documentation.
  * Templates use {{PLACEHOLDER}} substitution.
  */
 
-// ─── Grouping Prompt ──────────────────────────────────────────────────
+import type { CLIConfig } from '../../storage/repo-manager.js';
 
-export const GROUPING_SYSTEM_PROMPT = `You are a documentation architect. Given a list of source files with their exported symbols, group them into logical documentation modules.
+// ─── Default Prompts ──────────────────────────────────────────────────
+
+const DEFAULT_GROUPING_SYSTEM_PROMPT = `You are a documentation architect. Given a list of source files with their exported symbols, group them into logical documentation modules.
 
 Rules:
 - Each module should represent a cohesive feature, layer, or domain
@@ -17,7 +19,7 @@ Rules:
 - Group by functionality, not by file type or directory structure alone
 - Do NOT create modules for tests, configs, or non-source files`;
 
-export const GROUPING_USER_PROMPT = `Group these source files into documentation modules.
+const DEFAULT_GROUPING_USER_PROMPT = `Group these source files into documentation modules.
 
 **Files and their exports:**
 {{FILE_LIST}}
@@ -34,7 +36,7 @@ Example format:
 
 // ─── Leaf Module Prompt ───────────────────────────────────────────────
 
-export const MODULE_SYSTEM_PROMPT = `You are a technical documentation writer. Write clear, developer-focused documentation for a code module.
+const DEFAULT_MODULE_SYSTEM_PROMPT = `You are a technical documentation writer. Write clear, developer-focused documentation for a code module.
 
 Rules:
 - Reference actual function names, class names, and code patterns — do NOT invent APIs
@@ -43,7 +45,7 @@ Rules:
 - Structure the document however makes sense for this module — there is no mandatory format
 - Write for a developer who needs to understand and contribute to this code`;
 
-export const MODULE_USER_PROMPT = `Write documentation for the **{{MODULE_NAME}}** module.
+const DEFAULT_MODULE_USER_PROMPT = `Write documentation for the **{{MODULE_NAME}}** module.
 
 ## Source Code
 
@@ -62,7 +64,7 @@ Write comprehensive documentation for this module. Cover its purpose, how it wor
 
 // ─── Parent Module Prompt ─────────────────────────────────────────────
 
-export const PARENT_SYSTEM_PROMPT = `You are a technical documentation writer. Write a summary page for a module that contains sub-modules. Synthesize the children's documentation — do not re-read source code.
+const DEFAULT_PARENT_SYSTEM_PROMPT = `You are a technical documentation writer. Write a summary page for a module that contains sub-modules. Synthesize the children's documentation — do not re-read source code.
 
 Rules:
 - Reference actual components from the child modules
@@ -70,7 +72,7 @@ Rules:
 - Keep it concise — the reader can click through to child pages for detail
 - Include a Mermaid diagram only if it genuinely clarifies how the sub-modules relate`;
 
-export const PARENT_USER_PROMPT = `Write documentation for the **{{MODULE_NAME}}** module, which contains these sub-modules:
+const DEFAULT_PARENT_USER_PROMPT = `Write documentation for the **{{MODULE_NAME}}** module, which contains these sub-modules:
 
 {{CHILDREN_DOCS}}
 
@@ -83,7 +85,7 @@ Write a concise overview of this module group. Explain its purpose, how the sub-
 
 // ─── Overview Prompt ──────────────────────────────────────────────────
 
-export const OVERVIEW_SYSTEM_PROMPT = `You are a technical documentation writer. Write the top-level overview page for a repository wiki. This is the first page a new developer sees.
+const DEFAULT_OVERVIEW_SYSTEM_PROMPT = `You are a technical documentation writer. Write the top-level overview page for a repository wiki. This is the first page a new developer sees.
 
 Rules:
 - Be clear and welcoming — this is the entry point to the entire codebase
@@ -92,7 +94,7 @@ Rules:
 - Do NOT create module index tables or list every module with descriptions — just link to module pages naturally within the text
 - Use the inter-module edges and execution flow data for accuracy, but do NOT dump them raw`;
 
-export const OVERVIEW_USER_PROMPT = `Write the overview page for this repository's wiki.
+const DEFAULT_OVERVIEW_USER_PROMPT = `Write the overview page for this repository's wiki.
 
 ## Project Info
 
@@ -164,6 +166,16 @@ export function formatDirectoryTree(filePaths: string[]): string {
 }
 
 /**
+ * Validate that required placeholders are present in a prompt template.
+ */
+function validatePromptPlaceholders(template: string, requiredPlaceholders: string[]): void {
+  const missing = requiredPlaceholders.filter(placeholder => !template.includes(placeholder));
+  if (missing.length > 0) {
+    console.warn(`GitNexus: Custom prompt is missing required placeholders: ${missing.join(', ')}. Using default prompt.`);
+  }
+}
+
+/**
  * Format call edges as readable text.
  */
 export function formatCallEdges(
@@ -204,4 +216,39 @@ export function formatProcesses(
 function shortPath(fp: string): string {
   const parts = fp.replace(/\\/g, '/').split('/');
   return parts.length > 3 ? parts.slice(-3).join('/') : fp;
+}
+
+// ─── Prompt Getter Functions ───────────────────────────────────────────
+
+/**
+ * Get prompts from config, falling back to defaults.
+ * Validates that custom prompts contain required placeholders.
+ */
+export function getPrompts(config?: CLIConfig['wiki']) {
+  const prompts = {
+    groupingSystemPrompt: config?.groupingSystemPrompt || DEFAULT_GROUPING_SYSTEM_PROMPT,
+    groupingUserPrompt: config?.groupingUserPrompt || DEFAULT_GROUPING_USER_PROMPT,
+    moduleSystemPrompt: config?.moduleSystemPrompt || DEFAULT_MODULE_SYSTEM_PROMPT,
+    moduleUserPrompt: config?.moduleUserPrompt || DEFAULT_MODULE_USER_PROMPT,
+    parentSystemPrompt: config?.parentSystemPrompt || DEFAULT_PARENT_SYSTEM_PROMPT,
+    parentUserPrompt: config?.parentUserPrompt || DEFAULT_PARENT_USER_PROMPT,
+    overviewSystemPrompt: config?.overviewSystemPrompt || DEFAULT_OVERVIEW_SYSTEM_PROMPT,
+    overviewUserPrompt: config?.overviewUserPrompt || DEFAULT_OVERVIEW_USER_PROMPT,
+  };
+
+  // Validate required placeholders for custom prompts
+  if (config?.groupingUserPrompt) {
+    validatePromptPlaceholders(config.groupingUserPrompt, ['{{FILE_LIST}}', '{{DIRECTORY_TREE}}']);
+  }
+  if (config?.moduleUserPrompt) {
+    validatePromptPlaceholders(config.moduleUserPrompt, ['{{MODULE_NAME}}', '{{SOURCE_CODE}}']);
+  }
+  if (config?.parentUserPrompt) {
+    validatePromptPlaceholders(config.parentUserPrompt, ['{{MODULE_NAME}}', '{{CHILDREN_DOCS}}']);
+  }
+  if (config?.overviewUserPrompt) {
+    validatePromptPlaceholders(config.overviewUserPrompt, ['{{PROJECT_INFO}}', '{{MODULE_SUMMARIES}}']);
+  }
+
+  return prompts;
 }

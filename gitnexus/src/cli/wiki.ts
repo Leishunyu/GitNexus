@@ -123,6 +123,7 @@ export const wikiCommand = async (
     console.log('  Config saved to ~/.gitnexus/config.json\n');
   }
 
+  // Re-load config after saving to get the updated values
   const savedConfig = await loadCLIConfig();
   const hasSavedConfig = !!(savedConfig.apiKey && savedConfig.baseUrl);
   const hasCLIOverrides = !!(options?.apiKey || options?.model || options?.baseUrl);
@@ -258,6 +259,7 @@ export const wikiCommand = async (
       }
       bar.update(percent, { phase: label });
     },
+    savedConfig.wiki, // Pass wiki prompts from config
   );
 
   try {

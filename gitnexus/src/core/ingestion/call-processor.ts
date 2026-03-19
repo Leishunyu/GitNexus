@@ -20,15 +20,25 @@ import {
   extractReceiverNode,
   findEnclosingClassId,
   CALL_EXPRESSION_TYPES,
-  MAX_CHAIN_DEPTH,
-  extractCallChain,
+  extractMixedChain,
+  type MixedChainStep,
 } from './utils.js';
 import { buildTypeEnv } from './type-env.js';
 import type { ConstructorBinding } from './type-env.js';
 import { getTreeSitterBufferSize } from './constants.js';
-import type { ExtractedCall, ExtractedHeritage, ExtractedRoute, FileConstructorBindings } from './workers/parse-worker.js';
+import type { ExtractedCall, ExtractedAssignment, ExtractedHeritage, ExtractedRoute, FileConstructorBindings } from './workers/parse-worker.js';
 import { callRouters } from './call-routing.js';
-import { extractReturnTypeName } from './type-extractors/shared.js';
+import { extractReturnTypeName, stripNullable } from './type-extractors/shared.js';
+
+// Stdlib methods that preserve the receiver's type identity. When TypeEnv already
+// strips nullable wrappers (Option<User> → User), these chain steps are no-ops
+// for type resolution — the current type passes through unchanged.
+const TYPE_PRESERVING_METHODS = new Set([
+  'unwrap', 'expect', 'unwrap_or', 'unwrap_or_default', 'unwrap_or_else',  // Rust Option/Result
+  'clone', 'to_owned', 'as_ref', 'as_mut', 'borrow', 'borrow_mut',        // Rust clone/borrow
+  'get',                                                                     // Kotlin/Java Optional.get()
+  'orElseThrow',                                                             // Java Optional
+]);
 
 /**
  * Walk up the AST from a node to find the enclosing function/method.
@@ -128,6 +138,7 @@ export const processCalls = async (
 ): Promise<ExtractedHeritage[]> => {
   const parser = await loadParser();
   const collectedHeritage: ExtractedHeritage[] = [];
+  const pendingWrites: { receiverTypeName: string; propertyName: string; filePath: string; srcId: string }[] = [];
   const logSkipped = isVerboseIngestionEnabled();
   const skippedByLang = logSkipped ? new Map<string, number>() : null;
 
@@ -178,12 +189,50 @@ export const processCalls = async (
     const verifiedReceivers = typeEnv && typeEnv.constructorBindings.length > 0
       ? verifyConstructorBindings(typeEnv.constructorBindings, file.path, ctx)
       : new Map<string, string>();
+    const receiverIndex = buildReceiverTypeIndex(verifiedReceivers);
 
     ctx.enableCache(file.path);
 
     matches.forEach(match => {
       const captureMap: Record<string, any> = {};
       match.captures.forEach(c => captureMap[c.name] = c.node);
+      // ── Write access: emit ACCESSES {reason: 'write'} for assignments to member fields ──
+      if (captureMap['assignment'] && captureMap['assignment.receiver'] && captureMap['assignment.property']) {
+        const receiverNode = captureMap['assignment.receiver'];
+        const propertyName: string = captureMap['assignment.property'].text;
+        // Resolve receiver type: simple identifier → TypeEnv lookup or class resolution
+        let receiverTypeName: string | undefined;
+        const receiverText = receiverNode.text;
+        if (receiverText && typeEnv) {
+          receiverTypeName = typeEnv.lookup(receiverText, captureMap['assignment']);
+        }
+        // Fall back to verified constructor bindings (mirrors CALLS resolution tier 2)
+        if (!receiverTypeName && receiverText && receiverIndex.size > 0) {
+          const enclosing = findEnclosingFunction(captureMap['assignment'], file.path, ctx);
+          const funcName = enclosing ? extractFuncNameFromSourceId(enclosing) : '';
+          receiverTypeName = lookupReceiverType(receiverIndex, funcName, receiverText);
+        }
+        if (!receiverTypeName && receiverText) {
+          const resolved = ctx.resolve(receiverText, file.path);
+          if (resolved?.candidates.some(d =>
+            d.type === 'Class' || d.type === 'Struct' || d.type === 'Interface'
+              || d.type === 'Enum' || d.type === 'Record' || d.type === 'Impl',
+          )) {
+            receiverTypeName = receiverText;
+          }
+        }
+        if (receiverTypeName) {
+          const enclosing = findEnclosingFunction(captureMap['assignment'], file.path, ctx);
+          const srcId = enclosing || generateId('File', file.path);
+          // Defer resolution: Ruby attr_accessor properties are registered during
+          // this same loop, so cross-file lookups fail if the declaring file hasn't
+          // been processed yet. Collect now, resolve after all files are done.
+          pendingWrites.push({ receiverTypeName, propertyName, filePath: file.path, srcId });
+        }
+        // Assignment-only capture (no @call sibling): skip the rest of this
+        // forEach iteration — this acts as a `continue` in the match loop.
+        if (!captureMap['call']) return;
+      }
 
       if (!captureMap['call']) return;
 
@@ -225,8 +274,10 @@ export const processCalls = async (
                   description: item.accessorType,
                 },
               });
-              ctx.symbols.add(file.path, item.propName, nodeId, 'Property',
-                propEnclosingClassId ? { ownerId: propEnclosingClassId } : undefined);
+              ctx.symbols.add(file.path, item.propName, nodeId, 'Property', {
+                ...(propEnclosingClassId ? { ownerId: propEnclosingClassId } : {}),
+                ...(item.declaredType ? { declaredType: item.declaredType } : {}),
+              });
               const relId = generateId('DEFINES', `${fileId}->${nodeId}`);
               graph.addRelationship({
                 id: relId, sourceId: fileId, targetId: nodeId,
@@ -234,9 +285,9 @@ export const processCalls = async (
               });
               if (propEnclosingClassId) {
                 graph.addRelationship({
-                  id: generateId('HAS_METHOD', `${propEnclosingClassId}->${nodeId}`),
+                  id: generateId('HAS_PROPERTY', `${propEnclosingClassId}->${nodeId}`),
                   sourceId: propEnclosingClassId, targetId: nodeId,
-                  type: 'HAS_METHOD', confidence: 1.0, reason: '',
+                  type: 'HAS_PROPERTY', confidence: 1.0, reason: '',
                 });
               }
             }
@@ -255,10 +306,10 @@ export const processCalls = async (
       const receiverName = callForm === 'member' ? extractReceiverName(nameNode) : undefined;
       let receiverTypeName = receiverName && typeEnv ? typeEnv.lookup(receiverName, callNode) : undefined;
       // Fall back to verified constructor bindings for return type inference
-      if (!receiverTypeName && receiverName && verifiedReceivers.size > 0) {
+      if (!receiverTypeName && receiverName && receiverIndex.size > 0) {
         const enclosingFunc = findEnclosingFunction(callNode, file.path, ctx);
         const funcName = enclosingFunc ? extractFuncNameFromSourceId(enclosingFunc) : '';
-        receiverTypeName = lookupReceiverType(verifiedReceivers, funcName, receiverName);
+        receiverTypeName = lookupReceiverType(receiverIndex, funcName, receiverName);
       }
       // Fall back to class-as-receiver for static method calls (e.g. UserService.find_user()).
       // When the receiver name is not a variable in TypeEnv but resolves to a Class/Struct/Interface
@@ -271,32 +322,39 @@ export const processCalls = async (
           receiverTypeName = receiverName;
         }
       }
-      // Fall back to chained call resolution when the receiver is a call expression
-      // (e.g. svc.getUser().save() — receiver of save() is getUser(), not a simple identifier).
+      // Hoist sourceId so it's available for ACCESSES edge emission during chain walk.
+      const enclosingFuncId = findEnclosingFunction(callNode, file.path, ctx);
+      const sourceId = enclosingFuncId || generateId('File', file.path);
+
+      // Fall back to mixed chain resolution when the receiver is a complex expression
+      // (field chain, call chain, or interleaved — e.g. user.address.city.save() or
+      // svc.getUser().address.save()). Handles all cases with a single unified walk.
       if (callForm === 'member' && !receiverTypeName && !receiverName) {
         const receiverNode = extractReceiverNode(nameNode);
-        if (receiverNode && CALL_EXPRESSION_TYPES.has(receiverNode.type)) {
-          const extracted = extractCallChain(receiverNode);
-          if (extracted) {
-            // Resolve the base receiver type if possible
-            let baseType = extracted.baseReceiverName && typeEnv
+        if (receiverNode) {
+          const extracted = extractMixedChain(receiverNode);
+          if (extracted && extracted.chain.length > 0) {
+            let currentType = extracted.baseReceiverName && typeEnv
               ? typeEnv.lookup(extracted.baseReceiverName, callNode)
               : undefined;
-            if (!baseType && extracted.baseReceiverName && verifiedReceivers.size > 0) {
-              const enclosingFunc = findEnclosingFunction(callNode, file.path, ctx);
-              const funcName = enclosingFunc ? extractFuncNameFromSourceId(enclosingFunc) : '';
-              baseType = lookupReceiverType(verifiedReceivers, funcName, extracted.baseReceiverName);
+            if (!currentType && extracted.baseReceiverName && receiverIndex.size > 0) {
+              const funcName = enclosingFuncId ? extractFuncNameFromSourceId(enclosingFuncId) : '';
+              currentType = lookupReceiverType(receiverIndex, funcName, extracted.baseReceiverName);
             }
-            // Class-as-receiver for chain base (e.g. UserService.find_user().save())
-            if (!baseType && extracted.baseReceiverName) {
+            if (!currentType && extracted.baseReceiverName) {
               const cr = ctx.resolve(extracted.baseReceiverName, file.path);
               if (cr?.candidates.some(d =>
                 d.type === 'Class' || d.type === 'Interface' || d.type === 'Struct' || d.type === 'Enum',
               )) {
-                baseType = extracted.baseReceiverName;
+                currentType = extracted.baseReceiverName;
               }
             }
-            receiverTypeName = resolveChainedReceiver(extracted.chain, baseType, file.path, ctx);
+            if (currentType) {
+              receiverTypeName = walkMixedChain(
+                extracted.chain, currentType, file.path, ctx,
+                makeAccessEmitter(graph, sourceId),
+              );
+            }
           }
         }
       }
@@ -309,9 +367,6 @@ export const processCalls = async (
       }, file.path, ctx);
 
       if (!resolved) return;
-
-      const enclosingFuncId = findEnclosingFunction(callNode, file.path, ctx);
-      const sourceId = enclosingFuncId || generateId('File', file.path);
       const relId = generateId('CALLS', `${sourceId}:${calledName}->${resolved.nodeId}`);
 
       graph.addRelationship({
@@ -325,6 +380,22 @@ export const processCalls = async (
     });
 
     ctx.clearCache();
+  }
+
+  // ── Resolve deferred write-access edges ──
+  // All properties (including Ruby attr_accessor) are now registered.
+  for (const pw of pendingWrites) {
+    const fieldOwner = resolveFieldOwnership(pw.receiverTypeName, pw.propertyName, pw.filePath, ctx);
+    if (fieldOwner) {
+      graph.addRelationship({
+        id: generateId('ACCESSES', `${pw.srcId}:${fieldOwner.nodeId}:write`),
+        sourceId: pw.srcId,
+        targetId: fieldOwner.nodeId,
+        type: 'ACCESSES',
+        confidence: 1.0,
+        reason: 'write',
+      });
+    }
   }
 
   if (skippedByLang && skippedByLang.size > 0) {
@@ -345,6 +416,7 @@ interface ResolveResult {
   nodeId: string;
   confidence: number;
   reason: string;
+  returnType?: string;
 }
 
 const CALLABLE_SYMBOL_TYPES = new Set([
@@ -394,48 +466,9 @@ const toResolveResult = (
   nodeId: definition.nodeId,
   confidence: TIER_CONFIDENCE[tier],
   reason: tier === 'same-file' ? 'same-file' : tier === 'import-scoped' ? 'import-resolved' : 'global',
+  returnType: definition.returnType,
 });
 
-/**
- * Resolve a chain of intermediate method calls to find the receiver type for a
- * final member call.  Called when the receiver of a call is itself a call
- * expression (e.g. `svc.getUser().save()`).
- *
- * @param chainNames  Ordered list of method names from outermost to innermost
- *                    intermediate call (e.g. ['getUser'] for `svc.getUser().save()`).
- * @param baseReceiverTypeName  The already-resolved type of the base receiver
- *                              (e.g. 'UserService' for `svc`), or undefined.
- * @param currentFile  The file path for resolution context.
- * @param ctx  The resolution context for symbol lookup.
- * @returns The type name of the final intermediate call's return type, or undefined
- *          if resolution fails at any step.
- */
-function resolveChainedReceiver(
-  chainNames: string[],
-  baseReceiverTypeName: string | undefined,
-  currentFile: string,
-  ctx: ResolutionContext,
-): string | undefined {
-  let currentType = baseReceiverTypeName;
-  for (const name of chainNames) {
-    const resolved = resolveCallTarget(
-      { calledName: name, callForm: 'member', receiverTypeName: currentType },
-      currentFile,
-      ctx,
-    );
-    if (!resolved) return undefined;
-
-    const candidates = ctx.symbols.lookupFuzzy(name);
-    const symDef = candidates.find(c => c.nodeId === resolved.nodeId);
-    if (!symDef?.returnType) return undefined;
-
-    const returnTypeName = extractReturnTypeName(symDef.returnType);
-    if (!returnTypeName) return undefined;
-
-    currentType = returnTypeName;
-  }
-  return currentType;
-}
 
 /**
  * Resolve a function call to its target node ID using priority strategy:
@@ -529,48 +562,196 @@ const receiverKey = (scope: string, varName: string): string =>
   `${scope}\0${varName}`;
 
 /**
- * Look up a receiver type from a verified receiver map.
- * The map is keyed by `scope\0varName` (full scope with @startIndex).
- * Since the lookup side only has `funcName` (no startIndex), we scan for
- * all entries whose key starts with `funcName@` and has the matching varName.
- * If exactly one unique type is found, return it. If multiple distinct types
- * exist (true overload collision), return undefined (refuse to guess).
- * Falls back to the file-level scope key `\0varName` (empty funcName).
+ * Pre-built secondary index for O(1) receiver type lookups.
+ * Built once per file from the verified receiver map, keyed by funcName → varName.
+ */
+type ReceiverTypeEntry =
+  | { readonly kind: 'resolved'; readonly value: string }
+  | { readonly kind: 'ambiguous' };
+type ReceiverTypeIndex = Map<string, Map<string, ReceiverTypeEntry>>;
+
+/**
+ * Build a two-level secondary index from the verified receiver map.
+ * The verified map is keyed by `scope\0varName` where scope is either
+ * "funcName@startIndex" (inside a function) or "" (file level).
+ * Index structure: Map<funcName, Map<varName, ReceiverTypeEntry>>
+ */
+const buildReceiverTypeIndex = (map: Map<string, string>): ReceiverTypeIndex => {
+  const index: ReceiverTypeIndex = new Map();
+  for (const [key, typeName] of map) {
+    const nul = key.indexOf('\0');
+    if (nul < 0) continue;
+    const scope = key.slice(0, nul);
+    const varName = key.slice(nul + 1);
+    if (!varName) continue;
+    if (scope !== '' && !scope.includes('@')) continue;
+    const funcName = scope === '' ? '' : scope.slice(0, scope.indexOf('@'));
+
+    let varMap = index.get(funcName);
+    if (!varMap) { varMap = new Map(); index.set(funcName, varMap); }
+
+    const existing = varMap.get(varName);
+    if (existing === undefined) {
+      varMap.set(varName, { kind: 'resolved', value: typeName });
+    } else if (existing.kind === 'resolved' && existing.value !== typeName) {
+      varMap.set(varName, { kind: 'ambiguous' });
+    }
+  }
+  return index;
+};
+
+/**
+ * O(1) receiver type lookup using the pre-built secondary index.
+ * Returns the unique type name if unambiguous. Falls back to file-level scope.
  */
 const lookupReceiverType = (
-  map: Map<string, string>,
+  index: ReceiverTypeIndex,
   funcName: string,
   varName: string,
 ): string | undefined => {
-  // Fast path: file-level scope (empty funcName — used as fallback)
-  const fileLevelKey = receiverKey('', varName);
-
-  const prefix = `${funcName}@`;
-  const suffix = `\0${varName}`;
-  let found: string | undefined;
-  let ambiguous = false;
-
-  for (const [key, value] of map) {
-    if (key === fileLevelKey) continue; // handled separately below
-    if (key.startsWith(prefix) && key.endsWith(suffix)) {
-      // Verify the key is exactly "funcName@<digits>\0varName" with no extra chars.
-      // The part between prefix and suffix should be the startIndex (digits only),
-      // but we accept any non-empty segment to be forward-compatible.
-      const middle = key.slice(prefix.length, key.length - suffix.length);
-      if (middle.length === 0) continue; // malformed key — skip
-      if (found === undefined) {
-        found = value;
-      } else if (found !== value) {
-        ambiguous = true;
-        break;
-      }
+  const funcBucket = index.get(funcName);
+  if (funcBucket) {
+    const entry = funcBucket.get(varName);
+    if (entry?.kind === 'resolved') return entry.value;
+    if (entry?.kind === 'ambiguous') {
+      // Ambiguous in this function scope — try file-level fallback
+      const fileEntry = index.get('')?.get(varName);
+      return fileEntry?.kind === 'resolved' ? fileEntry.value : undefined;
     }
   }
+  // Fallback: file-level scope (funcName "")
+  if (funcName !== '') {
+    const fileEntry = index.get('')?.get(varName);
+    if (fileEntry?.kind === 'resolved') return fileEntry.value;
+  }
+  return undefined;
+};
 
-  if (!ambiguous && found !== undefined) return found;
+interface FieldResolution {
+  typeName: string;      // resolved declared type (continues chain threading)
+  fieldNodeId: string;   // nodeId of the Property symbol (for ACCESSES edge target)
+}
 
-  // Fallback: file-level scope (bindings outside any function)
-  return map.get(fileLevelKey);
+/**
+ * Resolve the type that results from accessing `receiverName.fieldName`.
+ * Requires declaredType on the Property node (needed for chain walking continuation).
+ */
+const resolveFieldAccessType = (
+  receiverName: string,
+  fieldName: string,
+  filePath: string,
+  ctx: ResolutionContext,
+): FieldResolution | undefined => {
+  const fieldDef = resolveFieldOwnership(receiverName, fieldName, filePath, ctx);
+  if (!fieldDef?.declaredType) return undefined;
+
+  // Use stripNullable (not extractReturnTypeName) — field types like List<User>
+  // should be preserved as-is, not unwrapped to User. Only strip nullable wrappers.
+  return {
+    typeName: stripNullable(fieldDef.declaredType),
+    fieldNodeId: fieldDef.nodeId,
+  };
+};
+
+/**
+ * Resolve a field's Property node given a receiver type name and field name.
+ * Does NOT require declaredType — used by write-access tracking where only the
+ * fieldNodeId is needed (no chain continuation).
+ */
+const resolveFieldOwnership = (
+  receiverName: string,
+  fieldName: string,
+  filePath: string,
+  ctx: ResolutionContext,
+): { nodeId: string; declaredType?: string } | undefined => {
+  const typeResolved = ctx.resolve(receiverName, filePath);
+  if (!typeResolved) return undefined;
+  const classDef = typeResolved.candidates.find(
+    d => d.type === 'Class' || d.type === 'Struct' || d.type === 'Interface'
+      || d.type === 'Enum' || d.type === 'Record' || d.type === 'Impl',
+  );
+  if (!classDef) return undefined;
+
+  return ctx.symbols.lookupFieldByOwner(classDef.nodeId, fieldName) ?? undefined;
+};
+
+/**
+ * Create a deduplicated ACCESSES edge emitter for a single source node.
+ * Each (sourceId, fieldNodeId) pair is emitted at most once per source.
+ */
+const makeAccessEmitter = (
+  graph: KnowledgeGraph,
+  sourceId: string,
+): OnFieldResolved => {
+  const emitted = new Set<string>();
+  return (fieldNodeId: string): void => {
+    const key = `${sourceId}\0${fieldNodeId}`;
+    if (emitted.has(key)) return;
+    emitted.add(key);
+
+    graph.addRelationship({
+      id: generateId('ACCESSES', `${sourceId}:${fieldNodeId}:read`),
+      sourceId,
+      targetId: fieldNodeId,
+      type: 'ACCESSES',
+      confidence: 1.0,
+      reason: 'read',
+    });
+  };
+};
+
+/**
+ * Walk a pre-built mixed chain of field/call steps, threading the current type
+ * through each step and returning the final resolved type.
+ *
+ * Returns `undefined` if any step cannot be resolved (chain is broken).
+ * The caller is responsible for seeding `startType` from its own context
+ * (TypeEnv, constructor bindings, or static-class fallback).
+ */
+type OnFieldResolved = (fieldNodeId: string) => void;
+
+const walkMixedChain = (
+  chain: MixedChainStep[],
+  startType: string,
+  filePath: string,
+  ctx: ResolutionContext,
+  onFieldResolved?: OnFieldResolved,
+): string | undefined => {
+  let currentType: string | undefined = startType;
+  for (const step of chain) {
+    if (!currentType) break;
+    if (step.kind === 'field') {
+      const resolved = resolveFieldAccessType(currentType, step.name, filePath, ctx);
+      if (!resolved) { currentType = undefined; break; }
+      onFieldResolved?.(resolved.fieldNodeId);
+      currentType = resolved.typeName;
+    } else {
+      // Ruby/Python: property access is syntactically identical to method calls.
+      // Try field resolution first — if the name is a known property with declaredType,
+      // use that type directly. Otherwise fall back to method call resolution.
+      const fieldResolved = resolveFieldAccessType(currentType, step.name, filePath, ctx);
+      if (fieldResolved) {
+        onFieldResolved?.(fieldResolved.fieldNodeId);
+        currentType = fieldResolved.typeName;
+        continue;
+      }
+      const resolved = resolveCallTarget(
+        { calledName: step.name, callForm: 'member', receiverTypeName: currentType },
+        filePath,
+        ctx,
+      );
+      if (!resolved) {
+        // Stdlib passthrough: unwrap(), clone(), etc. preserve the receiver type
+        if (TYPE_PRESERVING_METHODS.has(step.name)) continue;
+        currentType = undefined; break;
+      }
+      if (!resolved.returnType) { currentType = undefined; break; }
+      const retType = extractReturnTypeName(resolved.returnType);
+      if (!retType) { currentType = undefined; break; }
+      currentType = retType;
+    }
+  }
+  return currentType;
 };
 
 /**
@@ -587,12 +768,12 @@ export const processCallsFromExtracted = async (
   // Scope-aware receiver types: keyed by filePath → "funcName\0varName" → typeName.
   // The scope dimension prevents collisions when two functions in the same file
   // have same-named locals pointing to different constructor types.
-  const fileReceiverTypes = new Map<string, Map<string, string>>();
+  const fileReceiverTypes = new Map<string, ReceiverTypeIndex>();
   if (constructorBindings) {
     for (const { filePath, bindings } of constructorBindings) {
       const verified = verifyConstructorBindings(bindings, filePath, ctx, graph);
       if (verified.size > 0) {
-        fileReceiverTypes.set(filePath, verified);
+        fileReceiverTypes.set(filePath, buildReceiverTypeIndex(verified));
       }
     }
   }
@@ -638,29 +819,32 @@ export const processCallsFromExtracted = async (
         }
       }
 
-      // Step 2: if the call has a receiver call chain (e.g. svc.getUser().save()),
-      // resolve the chain to determine the final receiver type.
-      // This runs whenever receiverCallChain is present — even when Step 1 set a
-      // receiverTypeName, that type is the BASE receiver (e.g. UserService for svc),
-      // and the chain must be walked to produce the FINAL receiver (e.g. User from
-      // getUser() : User).
-      if (effectiveCall.receiverCallChain?.length) {
-        // Step 1 may have resolved the base receiver type (e.g. svc → UserService).
-        // Use it as the starting point for chain resolution.
-        let baseType = effectiveCall.receiverTypeName;
-        // If Step 1 didn't resolve it, try the receiver map directly.
-        if (!baseType && effectiveCall.receiverName && receiverMap) {
+      // Step 1c: mixed chain resolution (field, call, or interleaved — e.g. svc.getUser().address.save()).
+      // Runs whenever receiverMixedChain is present. Steps 1/1b may have resolved the base receiver
+      // type already; that type is used as the chain's starting point.
+      if (effectiveCall.receiverMixedChain?.length) {
+        // Use the already-resolved base type (from Steps 1/1b) or look it up now.
+        let currentType: string | undefined = effectiveCall.receiverTypeName;
+        if (!currentType && effectiveCall.receiverName && receiverMap) {
           const callFuncName = extractFuncNameFromSourceId(effectiveCall.sourceId);
-          baseType = lookupReceiverType(receiverMap, callFuncName, effectiveCall.receiverName);
+          currentType = lookupReceiverType(receiverMap, callFuncName, effectiveCall.receiverName);
         }
-        const chainedType = resolveChainedReceiver(
-          effectiveCall.receiverCallChain,
-          baseType,
-          effectiveCall.filePath,
-          ctx,
-        );
-        if (chainedType) {
-          effectiveCall = { ...effectiveCall, receiverTypeName: chainedType };
+        if (!currentType && effectiveCall.receiverName) {
+          const typeResolved = ctx.resolve(effectiveCall.receiverName, effectiveCall.filePath);
+          if (typeResolved?.candidates.some(d =>
+            d.type === 'Class' || d.type === 'Interface' || d.type === 'Struct' || d.type === 'Enum',
+          )) {
+            currentType = effectiveCall.receiverName;
+          }
+        }
+        if (currentType) {
+          const walkedType = walkMixedChain(
+            effectiveCall.receiverMixedChain, currentType, effectiveCall.filePath, ctx,
+            makeAccessEmitter(graph, effectiveCall.sourceId),
+          );
+          if (walkedType) {
+            effectiveCall = { ...effectiveCall, receiverTypeName: walkedType };
+          }
         }
       }
 
@@ -682,6 +866,63 @@ export const processCallsFromExtracted = async (
   }
 
   onProgress?.(totalFiles, totalFiles);
+};
+
+/**
+ * Resolve pre-extracted field write assignments to ACCESSES {reason: 'write'} edges.
+ * Accepts optional constructorBindings for return-type-aware receiver inference,
+ * mirroring processCallsFromExtracted's verified binding lookup.
+ */
+export const processAssignmentsFromExtracted = (
+  graph: KnowledgeGraph,
+  assignments: ExtractedAssignment[],
+  ctx: ResolutionContext,
+  constructorBindings?: FileConstructorBindings[],
+): void => {
+  // Build per-file receiver type indexes from verified constructor bindings
+  const fileReceiverTypes = new Map<string, ReceiverTypeIndex>();
+  if (constructorBindings) {
+    for (const { filePath, bindings } of constructorBindings) {
+      const verified = verifyConstructorBindings(bindings, filePath, ctx, graph);
+      if (verified.size > 0) {
+        fileReceiverTypes.set(filePath, buildReceiverTypeIndex(verified));
+      }
+    }
+  }
+
+  for (const asn of assignments) {
+    // Resolve the receiver type
+    let receiverTypeName = asn.receiverTypeName;
+    // Tier 2: verified constructor bindings (return-type inference)
+    if (!receiverTypeName && fileReceiverTypes.size > 0) {
+      const receiverMap = fileReceiverTypes.get(asn.filePath);
+      if (receiverMap) {
+        const funcName = extractFuncNameFromSourceId(asn.sourceId);
+        receiverTypeName = lookupReceiverType(receiverMap, funcName, asn.receiverText);
+      }
+    }
+    // Tier 3: static class-as-receiver fallback
+    if (!receiverTypeName) {
+      const resolved = ctx.resolve(asn.receiverText, asn.filePath);
+      if (resolved?.candidates.some(d =>
+        d.type === 'Class' || d.type === 'Struct' || d.type === 'Interface'
+          || d.type === 'Enum' || d.type === 'Record' || d.type === 'Impl',
+      )) {
+        receiverTypeName = asn.receiverText;
+      }
+    }
+    if (!receiverTypeName) continue;
+    const fieldOwner = resolveFieldOwnership(receiverTypeName, asn.propertyName, asn.filePath, ctx);
+    if (!fieldOwner) continue;
+    graph.addRelationship({
+      id: generateId('ACCESSES', `${asn.sourceId}:${fieldOwner.nodeId}:write`),
+      sourceId: asn.sourceId,
+      targetId: fieldOwner.nodeId,
+      type: 'ACCESSES',
+      confidence: 1.0,
+      reason: 'write',
+    });
+  }
 };
 
 /**

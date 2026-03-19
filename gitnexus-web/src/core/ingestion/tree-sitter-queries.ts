@@ -576,6 +576,7 @@ export const LANGUAGE_QUERIES: Record<SupportedLanguages, string> = {
   [SupportedLanguages.PHP]: PHP_QUERIES,
   [SupportedLanguages.Ruby]: RUBY_QUERIES,
   [SupportedLanguages.Kotlin]: KOTLIN_QUERIES,
+  [SupportedLanguages.Kotlin]: '', // Kotlin WASM parser not yet available for web
   [SupportedLanguages.Swift]: SWIFT_QUERIES,
 };
  

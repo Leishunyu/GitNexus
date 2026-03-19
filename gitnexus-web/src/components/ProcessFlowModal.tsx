@@ -6,6 +6,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { X, GitBranch, Copy, Focus, Layers, ZoomIn, ZoomOut } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import mermaid from 'mermaid';
 import { ProcessData, generateProcessMermaid } from '../lib/mermaid-generator';
 
@@ -53,6 +54,7 @@ mermaid.parseError = (err) => {
 };
 
 export const ProcessFlowModal = ({ process, onClose, onFocusInGraph, isFullScreen = false }: ProcessFlowModalProps) => {
+    const { t } = useTranslation();
     const containerRef = useRef<HTMLDivElement>(null);
     const diagramRef = useRef<HTMLDivElement>(null);
     const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -154,12 +156,12 @@ export const ProcessFlowModal = ({ process, onClose, onFocusInGraph, isFullScree
                 diagramRef.current!.innerHTML = `
           <div class="text-center p-8">
             <div class="text-red-400 text-sm font-medium mb-2">
-              ${isSizeError ? '📊 Diagram Too Large' : '⚠️ Render Error'}
+              ${isSizeError ? t('processFlow.diagramTooLarge') : t('processFlow.renderError')}
             </div>
             <div class="text-slate-400 text-xs max-w-md">
               ${isSizeError
-                        ? `This diagram has ${process.steps?.length || 0} steps and is too complex to render. Try viewing individual processes instead of "All Processes".`
-                        : `Unable to render diagram. Steps: ${process.steps?.length || 0}`
+                        ? t('processFlow.tooComplexMessage', { steps: process.steps?.length || 0 })
+                        : t('processFlow.unableToRender', { count: process.steps?.length || 0 })
                     }
             </div>
           </div>
@@ -168,7 +170,7 @@ export const ProcessFlowModal = ({ process, onClose, onFocusInGraph, isFullScree
         };
 
         renderDiagram();
-    }, [process]);
+    }, [process, t]);
 
     // Close on escape
     useEffect(() => {
@@ -220,7 +222,7 @@ export const ProcessFlowModal = ({ process, onClose, onFocusInGraph, isFullScree
                 {/* Header */}
                 <div className="px-6 py-5 border-b border-white/10 relative z-10">
                     <h2 className="text-lg font-semibold text-white">
-                        Process: {process.label}
+                        {t('processFlow.processTitle', { label: process.label })}
                     </h2>
                 </div>
 
@@ -250,7 +252,7 @@ export const ProcessFlowModal = ({ process, onClose, onFocusInGraph, isFullScree
                         <button
                             onClick={handleZoomOut}
                             className="p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-md transition-all"
-                            title="Zoom out (-)"
+                            title={t('processFlow.zoomOut')}
                         >
                             <ZoomOut className="w-4 h-4" />
                         </button>
@@ -260,7 +262,7 @@ export const ProcessFlowModal = ({ process, onClose, onFocusInGraph, isFullScree
                         <button
                             onClick={handleZoomIn}
                             className="p-2 text-slate-300 hover:text-white hover:bg-white/10 rounded-md transition-all"
-                            title="Zoom in (+)"
+                            title={t('processFlow.zoomIn')}
                         >
                             <ZoomIn className="w-4 h-4" />
                         </button>
@@ -268,9 +270,9 @@ export const ProcessFlowModal = ({ process, onClose, onFocusInGraph, isFullScree
                     <button
                         onClick={resetView}
                         className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-all"
-                        title="Reset zoom and pan"
+                        title={t('processFlow.resetView')}
                     >
-                        Reset View
+                        {t('processFlow.resetView')}
                     </button>
                     {onFocusInGraph && (
                         <button
@@ -278,7 +280,7 @@ export const ProcessFlowModal = ({ process, onClose, onFocusInGraph, isFullScree
                             className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-slate-900 bg-cyan-400 hover:bg-cyan-300 rounded-lg transition-all shadow-lg shadow-cyan-500/20"
                         >
                             <Focus className="w-4 h-4" />
-                            Toggle Focus
+                            {t('processFlow.toggleFocus')}
                         </button>
                     )}
                     <button
@@ -286,13 +288,13 @@ export const ProcessFlowModal = ({ process, onClose, onFocusInGraph, isFullScree
                         className="flex items-center gap-2 px-5 py-2.5 text-sm font-medium text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-all shadow-lg shadow-purple-500/20"
                     >
                         <Copy className="w-4 h-4" />
-                        Copy Mermaid
+                        {t('processFlow.copyMermaid')}
                     </button>
                     <button
                         onClick={onClose}
                         className="px-5 py-2.5 text-sm font-medium text-slate-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-all"
                     >
-                        Close
+                        {t('processFlow.close')}
                     </button>
                 </div>
             </div>

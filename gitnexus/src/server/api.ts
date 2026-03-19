@@ -13,7 +13,7 @@ import cors from 'cors';
 import path from 'path';
 import fs from 'fs/promises';
 import { loadMeta, listRegisteredRepos } from '../storage/repo-manager.js';
-import { executeQuery, closeLbug, withLbugDb } from '../core/lbug/lbug-adapter.js';
+import { initLbug, executeQuery as mcpExecuteQuery } from '../mcp/core/lbug-adapter.js';
 import { NODE_TABLES } from '../core/lbug/schema.js';
 import { GraphNode, GraphRelationship } from '../core/graph/types.js';
 import { searchFTSFromLbug } from '../core/search/bm25-index.js';
@@ -23,7 +23,7 @@ import { hybridSearch } from '../core/search/hybrid-search.js';
 import { LocalBackend } from '../mcp/local/local-backend.js';
 import { mountMCPEndpoints } from './mcp-http.js';
 
-const buildGraph = async (): Promise<{ nodes: GraphNode[]; relationships: GraphRelationship[] }> => {
+const buildGraph = async (repoId: string): Promise<{ nodes: GraphNode[]; relationships: GraphRelationship[] }> => {
   const nodes: GraphNode[] = [];
   for (const table of NODE_TABLES) {
     try {
@@ -40,7 +40,7 @@ const buildGraph = async (): Promise<{ nodes: GraphNode[]; relationships: GraphR
         query = `MATCH (n:${table}) RETURN n.id AS id, n.name AS name, n.filePath AS filePath, n.startLine AS startLine, n.endLine AS endLine, n.content AS content`;
       }
 
-      const rows = await executeQuery(query);
+      const rows = await mcpExecuteQuery(repoId, query);
       for (const row of rows) {
         nodes.push({
           id: row.id ?? row[0],
@@ -68,7 +68,8 @@ const buildGraph = async (): Promise<{ nodes: GraphNode[]; relationships: GraphR
   }
 
   const relationships: GraphRelationship[] = [];
-  const relRows = await executeQuery(
+  const relRows = await mcpExecuteQuery(
+    repoId,
     `MATCH (a)-[r:CodeRelation]->(b) RETURN a.id AS sourceId, b.id AS targetId, r.type AS type, r.confidence AS confidence, r.reason AS reason, r.step AS step`
   );
   for (const row of relRows) {
@@ -130,22 +131,39 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
   await backend.init();
   const cleanupMcp = mountMCPEndpoints(app, backend);
 
-  // Helper: resolve a repo by name from the global registry, or default to first
+  // Helper: check if a repo has a valid lbug database file
+  const hasLbugFile = async (storagePath: string): Promise<boolean> => {
+    try {
+      const lbugPath = path.join(storagePath, 'lbug');
+      const stat = await fs.stat(lbugPath);
+      return stat.isFile() && stat.size > 0;
+    } catch {
+      return false;
+    }
+  };
+
+  // Helper: resolve a repo by name from the global registry, or default to first with lbug
   const resolveRepo = async (repoName?: string) => {
     const repos = await listRegisteredRepos();
     if (repos.length === 0) return null;
     if (repoName) return repos.find(r => r.name === repoName) || null;
-    return repos[0]; // default to first
+    // Default: prefer first repo that has a valid lbug file
+    for (const repo of repos) {
+      if (await hasLbugFile(repo.storagePath)) return repo;
+    }
+    return repos[0];
   };
 
   // List all registered repos
   app.get('/api/repos', async (_req, res) => {
     try {
       const repos = await listRegisteredRepos();
-      res.json(repos.map(r => ({
+      const result = await Promise.all(repos.map(async r => ({
         name: r.name, path: r.path, indexedAt: r.indexedAt,
         lastCommit: r.lastCommit, stats: r.stats,
+        hasLbug: await hasLbugFile(r.storagePath),
       })));
+      res.json(result);
     } catch (err: any) {
       res.status(500).json({ error: err.message || 'Failed to list repos' });
     }
@@ -180,7 +198,9 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
         return;
       }
       const lbugPath = path.join(entry.storagePath, 'lbug');
-      const graph = await withLbugDb(lbugPath, async () => buildGraph());
+      const repoId = entry.name;
+      await initLbug(repoId, lbugPath);
+      const graph = await buildGraph(repoId);
       res.json(graph);
     } catch (err: any) {
       res.status(500).json({ error: err.message || 'Failed to build graph' });
@@ -202,7 +222,9 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
         return;
       }
       const lbugPath = path.join(entry.storagePath, 'lbug');
-      const result = await withLbugDb(lbugPath, () => executeQuery(cypher));
+      const repoId = entry.name;
+      await initLbug(repoId, lbugPath);
+      const result = await mcpExecuteQuery(repoId, cypher);
       res.json({ result });
     } catch (err: any) {
       res.status(500).json({ error: err.message || 'Query failed' });
@@ -224,20 +246,23 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
         return;
       }
       const lbugPath = path.join(entry.storagePath, 'lbug');
+      const repoId = entry.name;
+      await initLbug(repoId, lbugPath);
       const parsedLimit = Number(req.body.limit ?? 10);
       const limit = Number.isFinite(parsedLimit)
         ? Math.max(1, Math.min(100, Math.trunc(parsedLimit)))
         : 10;
 
-      const results = await withLbugDb(lbugPath, async () => {
+      const queryFn = (cypher: string) => mcpExecuteQuery(repoId, cypher);
+      const results = await (async () => {
         const { isEmbedderReady } = await import('../core/embeddings/embedder.js');
         if (isEmbedderReady()) {
           const { semanticSearch } = await import('../core/embeddings/embedding-pipeline.js');
-          return hybridSearch(query, limit, executeQuery, semanticSearch);
+          return hybridSearch(query, limit, queryFn, semanticSearch);
         }
         // FTS-only fallback when embeddings aren't loaded
         return searchFTSFromLbug(query, limit);
-      });
+      })();
       res.json({ results });
     } catch (err: any) {
       res.status(500).json({ error: err.message || 'Search failed' });
@@ -351,7 +376,6 @@ export const createServer = async (port: number, host: string = '127.0.0.1') => 
   const shutdown = async () => {
     server.close();
     await cleanupMcp();
-    await closeLbug();
     await backend.disconnect();
     process.exit(0);
   };

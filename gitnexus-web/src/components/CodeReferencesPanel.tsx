@@ -4,6 +4,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import { useAppState } from '../hooks/useAppState';
 import { NODE_COLORS } from '../lib/constants';
+import { useTranslation } from 'react-i18next';
 
 /** Map file extension to Prism syntax highlighter language identifier */
 const getSyntaxLanguage = (filePath: string | undefined): string => {
@@ -64,6 +65,7 @@ export interface CodeReferencesPanelProps {
 }
 
 export const CodeReferencesPanel = ({ onFocusNode }: CodeReferencesPanelProps) => {
+  const { t } = useTranslation();
   const {
     graph,
     fileContents,
@@ -222,19 +224,19 @@ export const CodeReferencesPanel = ({ onFocusNode }: CodeReferencesPanelProps) =
         <button
           onClick={() => setIsCollapsed(false)}
           className="p-2 text-text-secondary hover:text-cyan-400 hover:bg-cyan-500/10 rounded transition-colors"
-          title="Expand Code Panel"
+          title={t('codeReferences.expandPanel')}
         >
           <PanelLeft className="w-5 h-5" />
         </button>
         <div className="w-6 h-px bg-border-subtle my-1" />
         {showSelectedViewer && (
           <div className="text-[9px] text-amber-400 rotate-90 whitespace-nowrap font-medium tracking-wide">
-            SELECTED
+            {t('codeReferences.selected')}
           </div>
         )}
         {showCitations && (
           <div className="text-[9px] text-cyan-400 rotate-90 whitespace-nowrap font-medium tracking-wide mt-4">
-            AI • {aiReferences.length}
+            {t('codeReferences.aiCount', { count: aiReferences.length })}
           </div>
         )}
       </aside>
@@ -251,20 +253,20 @@ export const CodeReferencesPanel = ({ onFocusNode }: CodeReferencesPanelProps) =
       <div
         onMouseDown={startResize}
         className="absolute top-0 right-0 h-full w-2 cursor-col-resize bg-transparent hover:bg-cyan-500/25 transition-colors"
-        title="Drag to resize"
+        title={t('codeReferences.dragToResize')}
       />
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-border-subtle bg-gradient-to-r from-elevated/60 to-surface/60">
         <div className="flex items-center gap-2">
           <Code className="w-4 h-4 text-cyan-400" />
-          <span className="text-sm font-semibold text-text-primary">Code Inspector</span>
+          <span className="text-sm font-semibold text-text-primary">{t('codeReferences.codeInspector')}</span>
         </div>
         <div className="flex items-center gap-1.5">
           {showCitations && (
             <button
               onClick={() => clearCodeReferences()}
               className="p-1.5 text-text-muted hover:text-red-400 hover:bg-red-500/10 rounded transition-colors"
-              title="Clear AI citations"
+              title={t('codeReferences.clearCitations')}
             >
               <Trash2 className="w-4 h-4" />
             </button>
@@ -272,7 +274,7 @@ export const CodeReferencesPanel = ({ onFocusNode }: CodeReferencesPanelProps) =
           <button
             onClick={() => setIsCollapsed(true)}
             className="p-1.5 text-text-muted hover:text-text-primary hover:bg-hover rounded transition-colors"
-            title="Collapse Panel"
+            title={t('codeReferences.collapsePanel')}
           >
             <PanelLeftClose className="w-4 h-4" />
           </button>
@@ -286,7 +288,7 @@ export const CodeReferencesPanel = ({ onFocusNode }: CodeReferencesPanelProps) =
             <div className="px-3 py-2 bg-gradient-to-r from-amber-500/8 to-orange-500/5 border-b border-amber-500/20 flex items-center gap-2">
               <div className="flex items-center gap-1.5 px-2 py-0.5 bg-amber-500/15 rounded-md border border-amber-500/25">
                 <MousePointerClick className="w-3 h-3 text-amber-400" />
-                <span className="text-[10px] text-amber-300 font-semibold uppercase tracking-wide">Selected</span>
+                <span className="text-[10px] text-amber-300 font-semibold uppercase tracking-wide">{t('codeReferences.selectedLabel')}</span>
               </div>
               <FileCode className="w-3.5 h-3.5 text-amber-400/70 ml-1" />
               <span className="text-xs text-text-primary font-mono truncate flex-1">
@@ -295,7 +297,7 @@ export const CodeReferencesPanel = ({ onFocusNode }: CodeReferencesPanelProps) =
               <button
                 onClick={() => setSelectedNode(null)}
                 className="p-1 text-text-muted hover:text-amber-400 hover:bg-amber-500/10 rounded transition-colors"
-                title="Clear selection"
+                title={t('codeReferences.clearSelection')}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -338,9 +340,9 @@ export const CodeReferencesPanel = ({ onFocusNode }: CodeReferencesPanelProps) =
               ) : (
                 <div className="px-3 py-3 text-sm text-text-muted">
                   {selectedIsFile ? (
-                    <>Code not available in memory for <span className="font-mono">{selectedFilePath}</span></>
+                    <>{t('codeReferences.codeNotAvailable')} <span className="font-mono">{selectedFilePath}</span></>
                   ) : (
-                    <>Select a file node to preview its contents.</>
+                    <>{t('codeReferences.selectFileNode')}</>
                   )}
                 </div>
               )}
@@ -360,9 +362,9 @@ export const CodeReferencesPanel = ({ onFocusNode }: CodeReferencesPanelProps) =
             <div className="px-3 py-2 bg-gradient-to-r from-cyan-500/8 to-teal-500/5 border-b border-cyan-500/20 flex items-center gap-2">
               <div className="flex items-center gap-1.5 px-2 py-0.5 bg-cyan-500/15 rounded-md border border-cyan-500/25">
                 <Sparkles className="w-3 h-3 text-cyan-400" />
-                <span className="text-[10px] text-cyan-300 font-semibold uppercase tracking-wide">AI Citations</span>
+                <span className="text-[10px] text-cyan-300 font-semibold uppercase tracking-wide">{t('codeReferences.aiCitations')}</span>
               </div>
-              <span className="text-xs text-text-muted ml-1">{aiReferences.length} reference{aiReferences.length !== 1 ? 's' : ''}</span>
+              <span className="text-xs text-text-muted ml-1">{t('codeReferences.references', { count: aiReferences.length })}</span>
             </div>
             <div className="flex-1 min-h-0 overflow-y-auto scrollbar-thin p-3 space-y-3">
             {refsWithSnippets.map(({ ref, content, start, highlightStart, highlightEnd, totalLines }) => {
@@ -404,7 +406,7 @@ export const CodeReferencesPanel = ({ onFocusNode }: CodeReferencesPanelProps) =
                         {endDisplay !== startDisplay ? `–${endDisplay}` : ''}
                       </span>
                     )}
-                    {totalLines > 0 && <span className="text-text-muted"> • {totalLines} lines</span>}
+                    {totalLines > 0 && <span className="text-text-muted"> • {t('codeReferences.lines', { count: totalLines })}</span>}
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
@@ -420,7 +422,7 @@ export const CodeReferencesPanel = ({ onFocusNode }: CodeReferencesPanelProps) =
                         onFocusNode(nodeId);
                       }}
                       className="p-1.5 text-text-muted hover:text-text-primary hover:bg-hover rounded transition-colors"
-                      title="Focus in graph"
+                      title={t('codeReferences.focusInGraph')}
                     >
                       <Target className="w-4 h-4" />
                     </button>
@@ -428,7 +430,7 @@ export const CodeReferencesPanel = ({ onFocusNode }: CodeReferencesPanelProps) =
                   <button
                     onClick={() => removeCodeReference(ref.id)}
                     className="p-1.5 text-text-muted hover:text-text-primary hover:bg-hover rounded transition-colors"
-                    title="Remove"
+                    title={t('codeReferences.remove')}
                   >
                     <X className="w-4 h-4" />
                   </button>
@@ -470,7 +472,7 @@ export const CodeReferencesPanel = ({ onFocusNode }: CodeReferencesPanelProps) =
                   </SyntaxHighlighter>
                 ) : (
                   <div className="px-3 py-3 text-sm text-text-muted">
-                    Code not available in memory for <span className="font-mono">{ref.filePath}</span>
+                    {t('codeReferences.codeNotAvailable')} <span className="font-mono">{ref.filePath}</span>
                   </div>
                 )}
               </div>

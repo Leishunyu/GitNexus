@@ -2,12 +2,14 @@ import { Brain, Loader2, Check, AlertCircle, Zap, FlaskConical } from 'lucide-re
 import { useAppState } from '../hooks/useAppState';
 import { useState } from 'react';
 import { WebGPUFallbackDialog } from './WebGPUFallbackDialog';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Embedding status indicator and trigger button
  * Shows in header when graph is loaded
  */
 export const EmbeddingStatus = () => {
+  const { t } = useTranslation();
   const {
     embeddingStatus,
     embeddingProgress,
@@ -83,20 +85,20 @@ export const EmbeddingStatus = () => {
             <button
               onClick={handleTestArrayParams}
               className="flex items-center gap-1 px-2 py-1.5 bg-surface border border-border-subtle rounded-lg text-xs text-text-muted hover:bg-hover hover:text-text-secondary transition-all"
-              title="Test if LadybugDB supports array params"
+              title={t('embedding.testArrayParams')}
             >
               <FlaskConical className="w-3 h-3" />
-              {testResult || 'Test'}
+              {testResult || t('embedding.test')}
             </button>
           )}
           
           <button
             onClick={() => handleStartEmbeddings()}
             className="flex items-center gap-2 px-3 py-1.5 bg-surface border border-border-subtle rounded-lg text-sm text-text-secondary hover:bg-hover hover:text-text-primary hover:border-accent/50 transition-all group"
-            title="Generate embeddings for semantic search"
+            title={t('embedding.generateEmbeddings')}
           >
             <Brain className="w-4 h-4 text-node-interface group-hover:text-accent transition-colors" />
-            <span className="hidden sm:inline">Enable Semantic Search</span>
+            <span className="hidden sm:inline">{t('embedding.enableSemanticSearch')}</span>
             <Zap className="w-3 h-3 text-text-muted" />
           </button>
         </div>
@@ -113,7 +115,7 @@ export const EmbeddingStatus = () => {
         <div className="flex items-center gap-2.5 px-3 py-1.5 bg-surface border border-accent/30 rounded-lg text-sm">
           <Loader2 className="w-4 h-4 text-accent animate-spin" />
           <div className="flex flex-col gap-0.5">
-            <span className="text-text-secondary text-xs">Loading AI model...</span>
+            <span className="text-text-secondary text-xs">{t('embedding.loadingModel')}</span>
             <div className="w-24 h-1 bg-elevated rounded-full overflow-hidden">
               <div 
                 className="h-full bg-gradient-to-r from-accent to-node-interface rounded-full transition-all duration-300"
@@ -138,7 +140,7 @@ export const EmbeddingStatus = () => {
         <Loader2 className="w-4 h-4 text-node-function animate-spin" />
         <div className="flex flex-col gap-0.5">
           <span className="text-text-secondary text-xs">
-            Embedding {processed}/{total} nodes
+            {t('embedding.embeddingNodes', { processed, total })}
           </span>
           <div className="w-24 h-1 bg-elevated rounded-full overflow-hidden">
             <div 
@@ -156,7 +158,7 @@ export const EmbeddingStatus = () => {
     return (
       <div className="flex items-center gap-2 px-3 py-1.5 bg-surface border border-node-interface/30 rounded-lg text-sm text-text-secondary">
         <Loader2 className="w-4 h-4 text-node-interface animate-spin" />
-        <span className="text-xs">Creating vector index...</span>
+        <span className="text-xs">{t('embedding.creatingIndex')}</span>
       </div>
     );
   }
@@ -166,10 +168,10 @@ export const EmbeddingStatus = () => {
     return (
       <div 
         className="flex items-center gap-2 px-3 py-1.5 bg-node-function/10 border border-node-function/30 rounded-lg text-sm text-node-function"
-        title="Semantic search is ready! Use natural language in the AI chat."
+        title={t('embedding.semanticReadyTooltip')}
       >
         <Check className="w-4 h-4" />
-        <span className="text-xs font-medium">Semantic Ready</span>
+        <span className="text-xs font-medium">{t('embedding.semanticReady')}</span>
       </div>
     );
   }
@@ -181,10 +183,10 @@ export const EmbeddingStatus = () => {
         <button
           onClick={() => handleStartEmbeddings()}
           className="flex items-center gap-2 px-3 py-1.5 bg-red-500/10 border border-red-500/30 rounded-lg text-sm text-red-400 hover:bg-red-500/20 transition-colors"
-          title={embeddingProgress?.error || 'Embedding failed. Click to retry.'}
+          title={embeddingProgress?.error || t('embedding.embeddingFailedTooltip')}
         >
           <AlertCircle className="w-4 h-4" />
-          <span className="text-xs">Failed - Retry</span>
+          <span className="text-xs">{t('embedding.failedRetry')}</span>
         </button>
         {fallbackDialog}
       </>

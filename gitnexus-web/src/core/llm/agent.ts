@@ -124,7 +124,7 @@ When generating diagrams:
 BAD:  A[User's Data] --> B(Process & Save)
 GOOD: A["User Data"] --> B["Process and Save"]
 `;
-export const createChatModel = (config: ProviderConfig): BaseChatModel => {
+export const createChatModel = (config: ProviderConfig, proxyOrigin?: string): BaseChatModel => {
   switch (config.provider) {
     case 'openai': {
       const openaiConfig = config as OpenAIConfig;
@@ -140,7 +140,7 @@ export const createChatModel = (config: ProviderConfig): BaseChatModel => {
         maxTokens: openaiConfig.maxTokens,
         configuration: {
           apiKey: openaiConfig.apiKey,
-          ...(openaiConfig.baseUrl ? { baseURL: openaiConfig.baseUrl } : {}),
+          baseURL: openaiConfig.baseUrl
         },
         streaming: true,
       });

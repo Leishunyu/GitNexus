@@ -8,7 +8,10 @@ import { ToolCallCard } from './ToolCallCard';
 import { isProviderConfigured } from '../core/llm/settings-service';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { ProcessesPanel } from './ProcessesPanel';
+import { useTranslation } from 'react-i18next';
+
 export const RightPanel = () => {
+  const { t } = useTranslation();
   const {
     isRightPanelOpen,
     setRightPanelOpen,
@@ -199,10 +202,10 @@ export const RightPanel = () => {
   };
 
   const chatSuggestions = [
-    'Explain the project architecture',
-    'What does this project do?',
-    'Show me the most important files',
-    'Find all API handlers',
+    t('rightPanel.explainArchitecture'),
+    t('rightPanel.whatDoesProjectDo'),
+    t('rightPanel.showImportantFiles'),
+    t('rightPanel.findAPIHandlers'),
   ];
 
   if (!isRightPanelOpen) return null;
@@ -221,7 +224,7 @@ export const RightPanel = () => {
               }`}
           >
             <Sparkles className="w-3.5 h-3.5" />
-            <span>Nexus AI</span>
+            <span>{t('rightPanel.nexusAI')}</span>
           </button>
 
           {/* Processes Tab */}
@@ -233,9 +236,9 @@ export const RightPanel = () => {
               }`}
           >
             <GitBranch className="w-3.5 h-3.5" />
-            <span>Processes</span>
+            <span>{t('rightPanel.processes')}</span>
             <span className="text-[10px] px-1.5 py-0.5 bg-gradient-to-r from-violet-500 to-fuchsia-500 text-white rounded-full font-semibold">
-              NEW
+              {t('rightPanel.new')}
             </span>
           </button>
         </div>
@@ -244,7 +247,7 @@ export const RightPanel = () => {
         <button
           onClick={() => setRightPanelOpen(false)}
           className="p-1.5 text-text-muted hover:text-text-primary hover:bg-hover rounded transition-colors"
-          title="Close Panel"
+          title={t('rightPanel.closePanel')}
         >
           <PanelRightClose className="w-4 h-4" />
         </button>
@@ -265,12 +268,12 @@ export const RightPanel = () => {
             <div className="ml-auto flex items-center gap-2">
               {!isAgentReady && (
                 <span className="text-[11px] px-2 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                  Configure AI
+                  {t('rightPanel.configureAI')}
                 </span>
               )}
               {isAgentInitializing && (
                 <span className="text-[11px] px-2 py-1 rounded-full bg-surface border border-border-subtle flex items-center gap-1 text-text-muted">
-                  <Loader2 className="w-3 h-3 animate-spin" /> Connecting
+                  <Loader2 className="w-3 h-3 animate-spin" /> {t('rightPanel.connecting')}
                 </span>
               )}
             </div>
@@ -294,10 +297,10 @@ export const RightPanel = () => {
                   🧠
                 </div>
                 <h3 className="text-base font-medium mb-2">
-                  Ask me anything
+                  {t('rightPanel.askAnything')}
                 </h3>
                 <p className="text-sm text-text-secondary leading-relaxed mb-5">
-                  I can help you understand the architecture, find functions, or explain connections.
+                  {t('rightPanel.helpDescription')}
                 </p>
                 <div className="flex flex-wrap gap-2 justify-center">
                   {chatSuggestions.map((suggestion) => (
@@ -323,7 +326,7 @@ export const RightPanel = () => {
                       <div className="mb-4">
                         <div className="flex items-center gap-2 mb-2">
                           <User className="w-4 h-4 text-text-muted" />
-                          <span className="text-xs font-medium text-text-muted uppercase tracking-wide">You</span>
+                          <span className="text-xs font-medium text-text-muted uppercase tracking-wide">{t('rightPanel.you')}</span>
                         </div>
                         <div className="pl-6 text-sm text-text-primary">
                           {message.content}
@@ -336,7 +339,7 @@ export const RightPanel = () => {
                       <div>
                         <div className="flex items-center gap-2 mb-3">
                           <Sparkles className="w-4 h-4 text-accent" />
-                          <span className="text-xs font-medium text-text-muted uppercase tracking-wide">Nexus AI</span>
+                          <span className="text-xs font-medium text-text-muted uppercase tracking-wide">{t('rightPanel.nexusAI')}</span>
                           {isChatLoading && message === chatMessages[chatMessages.length - 1] && (
                             <Loader2 className="w-3 h-3 animate-spin text-accent" />
                           )}
@@ -400,7 +403,7 @@ export const RightPanel = () => {
                 value={chatInput}
                 onChange={(e) => setChatInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder="Ask about the codebase..."
+                placeholder={t('rightPanel.askPlaceholder')}
                 rows={1}
                 className="flex-1 bg-transparent border-none outline-none text-sm text-text-primary placeholder:text-text-muted resize-none min-h-[36px] scrollbar-thin"
                 style={{ height: '36px', overflowY: 'hidden' }}
@@ -408,15 +411,15 @@ export const RightPanel = () => {
               <button
                 onClick={clearChat}
                 className="px-2 py-1 text-xs text-text-muted hover:text-text-primary transition-colors"
-                title="Clear chat"
+                title={t('rightPanel.clear')}
               >
-                Clear
+                {t('rightPanel.clear')}
               </button>
               {isChatLoading ? (
                 <button
                   onClick={stopChatResponse}
                   className="w-9 h-9 flex items-center justify-center bg-red-500/80 rounded-md text-white transition-all hover:bg-red-500"
-                  title="Stop response"
+                  title={t('rightPanel.stopResponse')}
                 >
                   <Square className="w-3.5 h-3.5 fill-current" />
                 </button>
@@ -435,8 +438,8 @@ export const RightPanel = () => {
                 <AlertTriangle className="w-3.5 h-3.5" />
                 <span>
                   {isProviderConfigured()
-                    ? 'Initializing AI agent...'
-                    : 'Configure an LLM provider to enable chat.'}
+                    ? t('rightPanel.initializingAgent')
+                    : t('rightPanel.configureLLM')}
                 </span>
               </div>
             )}

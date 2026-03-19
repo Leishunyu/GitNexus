@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import mermaid from 'mermaid';
 import { AlertTriangle, Maximize2 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { ProcessFlowModal } from './ProcessFlowModal';
 import type { ProcessData } from '../lib/mermaid-generator';
 
@@ -52,6 +53,7 @@ interface MermaidDiagramProps {
 }
 
 export const MermaidDiagram = ({ code }: MermaidDiagramProps) => {
+  const { t } = useTranslation();
   const containerRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
@@ -103,12 +105,12 @@ export const MermaidDiagram = ({ code }: MermaidDiagramProps) => {
       <div className="my-3 p-4 bg-rose-500/10 border border-rose-500/30 rounded-lg">
         <div className="flex items-center gap-2 text-rose-300 text-sm mb-2">
           <AlertTriangle className="w-4 h-4" />
-          <span className="font-medium">Diagram Error</span>
+          <span className="font-medium">{t('mermaid.diagramError')}</span>
         </div>
         <pre className="text-xs text-rose-200/70 font-mono whitespace-pre-wrap">{error}</pre>
         <details className="mt-2">
           <summary className="text-xs text-text-muted cursor-pointer hover:text-text-secondary">
-            Show source
+            {t('mermaid.showSource')}
           </summary>
           <pre className="mt-2 p-2 bg-surface rounded text-xs text-text-muted overflow-x-auto">
             {code}
@@ -125,12 +127,12 @@ export const MermaidDiagram = ({ code }: MermaidDiagramProps) => {
           {/* Header */}
           <div className="flex items-center justify-between px-3 py-2 bg-surface/60 border-b border-border-subtle">
             <span className="text-[10px] text-text-muted uppercase tracking-wider font-medium">
-              Diagram
+              {t('mermaid.diagram')}
             </span>
             <button
               onClick={() => setShowModal(true)}
               className="p-1 text-text-muted hover:text-text-primary hover:bg-hover rounded transition-colors"
-              title="Expand"
+              title={t('mermaid.expand')}
             >
               <Maximize2 className="w-3.5 h-3.5" />
             </button>

@@ -3,6 +3,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
+import { useTranslation } from 'react-i18next';
 import { MermaidDiagram } from './MermaidDiagram';
 import { ToolCallCard } from './ToolCallCard';
 import { Copy, Check } from 'lucide-react';
@@ -38,6 +39,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     toolCalls,
     showCopyButton = false
 }) => {
+    const { t } = useTranslation();
     const [copied, setCopied] = useState(false);
 
     const handleCopy = async () => {
@@ -108,7 +110,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                         href={hrefStr}
                         onClick={(e) => handleLinkClick(e, hrefStr)}
                         className={`${baseParams} ${colorParams}`}
-                        title={isNodeRef ? `View ${inner} in Code panel` : `Open in Code panel • ${inner}`}
+                        title={isNodeRef ? t('markdown.viewInCodePanel', { inner }) : t('markdown.openInCodePanel', { inner })}
                         {...props}
                     >
                         <span className="text-inherit">{children}</span>
@@ -189,7 +191,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                         title="Copy to clipboard"
                     >
                         {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
-                        <span>{copied ? 'Copied' : 'Copy'}</span>
+                        <span>{copied ? t('markdown.copied') : t('markdown.copy')}</span>
                     </button>
                 </div>
             )}

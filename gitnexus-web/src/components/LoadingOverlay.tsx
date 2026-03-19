@@ -1,10 +1,12 @@
 import { PipelineProgress } from '../types/pipeline';
+import { useTranslation } from 'react-i18next';
 
 interface LoadingOverlayProps {
   progress: PipelineProgress;
 }
 
 export const LoadingOverlay = ({ progress }: LoadingOverlayProps) => {
+  const { t } = useTranslation();
   return (
     <div className="fixed inset-0 flex flex-col items-center justify-center bg-void z-50">
       {/* Background gradient effects */}
@@ -47,11 +49,11 @@ export const LoadingOverlay = ({ progress }: LoadingOverlayProps) => {
         <div className="mt-8 flex items-center gap-6 text-xs text-text-muted">
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 bg-node-file rounded-full" />
-            <span>{progress.stats.filesProcessed} / {progress.stats.totalFiles} files</span>
+            <span>{t('loading.filesProgress', { processed: progress.stats.filesProcessed, total: progress.stats.totalFiles })}</span>
           </div>
           <div className="flex items-center gap-2">
             <span className="w-2 h-2 bg-node-function rounded-full" />
-            <span>{progress.stats.nodesCreated} nodes</span>
+            <span>{t('loading.nodesCreated', { count: progress.stats.nodesCreated })}</span>
           </div>
         </div>
       )}

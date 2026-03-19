@@ -18,6 +18,7 @@ import {
 import { useAppState } from '../hooks/useAppState';
 import { FILTERABLE_LABELS, NODE_COLORS, ALL_EDGE_TYPES, EDGE_INFO, type EdgeType } from '../lib/constants';
 import { GraphNode, NodeLabel } from '../core/graph/types';
+import { useTranslation } from 'react-i18next';
 
 // Tree node structure
 interface TreeNode {
@@ -195,6 +196,7 @@ interface FileTreePanelProps {
 }
 
 export const FileTreePanel = ({ onFocusNode }: FileTreePanelProps) => {
+  const { t } = useTranslation();
   const { graph, visibleLabels, toggleLabelVisibility, visibleEdgeTypes, toggleEdgeVisibility, selectedNode, setSelectedNode, openCodePanel, depthFilter, setDepthFilter } = useAppState();
 
   const [isCollapsed, setIsCollapsed] = useState(false);
@@ -273,7 +275,7 @@ export const FileTreePanel = ({ onFocusNode }: FileTreePanelProps) => {
         <button
           onClick={() => setIsCollapsed(false)}
           className="p-2 text-text-secondary hover:text-text-primary hover:bg-hover rounded transition-colors"
-          title="Expand Panel"
+          title={t('fileTree.expandPanel')}
         >
           <PanelLeft className="w-5 h-5" />
         </button>
@@ -281,14 +283,14 @@ export const FileTreePanel = ({ onFocusNode }: FileTreePanelProps) => {
         <button
           onClick={() => { setIsCollapsed(false); setActiveTab('files'); }}
           className={`p-2 rounded transition-colors ${activeTab === 'files' ? 'text-accent bg-accent/10' : 'text-text-secondary hover:text-text-primary hover:bg-hover'}`}
-          title="File Explorer"
+          title={t('fileTree.fileExplorer')}
         >
           <Folder className="w-5 h-5" />
         </button>
         <button
           onClick={() => { setIsCollapsed(false); setActiveTab('filters'); }}
           className={`p-2 rounded transition-colors ${activeTab === 'filters' ? 'text-accent bg-accent/10' : 'text-text-secondary hover:text-text-primary hover:bg-hover'}`}
-          title="Filters"
+          title={t('fileTree.filters')}
         >
           <Filter className="w-5 h-5" />
         </button>
@@ -308,7 +310,7 @@ export const FileTreePanel = ({ onFocusNode }: FileTreePanelProps) => {
               : 'text-text-secondary hover:text-text-primary hover:bg-hover'
               }`}
           >
-            Explorer
+            {t('fileTree.explorer')}
           </button>
           <button
             onClick={() => setActiveTab('filters')}
@@ -317,13 +319,13 @@ export const FileTreePanel = ({ onFocusNode }: FileTreePanelProps) => {
               : 'text-text-secondary hover:text-text-primary hover:bg-hover'
               }`}
           >
-            Filters
+            {t('fileTree.filters')}
           </button>
         </div>
         <button
           onClick={() => setIsCollapsed(true)}
           className="p-1 text-text-muted hover:text-text-primary hover:bg-hover rounded transition-colors"
-          title="Collapse Panel"
+          title={t('fileTree.collapsePanel')}
         >
           <PanelLeftClose className="w-4 h-4" />
         </button>
@@ -337,7 +339,7 @@ export const FileTreePanel = ({ onFocusNode }: FileTreePanelProps) => {
               <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-text-muted" />
               <input
                 type="text"
-                placeholder="Search files..."
+                placeholder={t('fileTree.searchFiles')}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-8 pr-3 py-1.5 bg-elevated border border-border-subtle rounded text-xs text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent"
@@ -349,7 +351,7 @@ export const FileTreePanel = ({ onFocusNode }: FileTreePanelProps) => {
           <div className="flex-1 overflow-y-auto scrollbar-thin py-2">
             {fileTree.length === 0 ? (
               <div className="px-3 py-4 text-center text-text-muted text-xs">
-                No files loaded
+                {t('fileTree.noFilesLoaded')}
               </div>
             ) : (
               fileTree.map(node => (
@@ -373,10 +375,10 @@ export const FileTreePanel = ({ onFocusNode }: FileTreePanelProps) => {
         <div className="flex-1 overflow-y-auto scrollbar-thin p-3">
           <div className="mb-3">
             <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wide mb-2">
-              Node Types
+              {t('fileTree.nodeTypes')}
             </h3>
             <p className="text-[11px] text-text-muted mb-3">
-              Toggle visibility of node types in the graph
+              {t('fileTree.nodeTypesDesc')}
             </p>
           </div>
 
@@ -415,10 +417,10 @@ export const FileTreePanel = ({ onFocusNode }: FileTreePanelProps) => {
           {/* Edge Type Toggles */}
           <div className="mt-6 pt-4 border-t border-border-subtle">
             <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wide mb-2">
-              Edge Types
+              {t('fileTree.edgeTypes')}
             </h3>
             <p className="text-[11px] text-text-muted mb-3">
-              Toggle visibility of relationship types
+              {t('fileTree.edgeTypesDesc')}
             </p>
 
             <div className="flex flex-col gap-1">
@@ -456,19 +458,19 @@ export const FileTreePanel = ({ onFocusNode }: FileTreePanelProps) => {
           <div className="mt-6 pt-4 border-t border-border-subtle">
             <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wide mb-2">
               <Target className="w-3 h-3 inline mr-1.5" />
-              Focus Depth
+              {t('fileTree.focusDepth')}
             </h3>
             <p className="text-[11px] text-text-muted mb-3">
-              Show nodes within N hops of selection
+              {t('fileTree.focusDepthDesc')}
             </p>
 
             <div className="flex flex-wrap gap-1.5">
               {[
-                { value: null, label: 'All' },
-                { value: 1, label: '1 hop' },
-                { value: 2, label: '2 hops' },
-                { value: 3, label: '3 hops' },
-                { value: 5, label: '5 hops' },
+                { value: null, label: t('fileTree.all') },
+                { value: 1, label: t('fileTree.oneHop') },
+                { value: 2, label: t('fileTree.twoHops') },
+                { value: 3, label: t('fileTree.threeHops') },
+                { value: 5, label: t('fileTree.fiveHops') },
               ].map(({ value, label }) => (
                 <button
                   key={label}
@@ -488,7 +490,7 @@ export const FileTreePanel = ({ onFocusNode }: FileTreePanelProps) => {
 
             {depthFilter !== null && !selectedNode && (
               <p className="mt-2 text-[10px] text-amber-400">
-                Select a node to apply depth filter
+                {t('fileTree.selectNodeForDepth')}
               </p>
             )}
           </div>
@@ -496,7 +498,7 @@ export const FileTreePanel = ({ onFocusNode }: FileTreePanelProps) => {
           {/* Legend */}
           <div className="mt-6 pt-4 border-t border-border-subtle">
             <h3 className="text-xs font-medium text-text-secondary uppercase tracking-wide mb-3">
-              Color Legend
+              {t('fileTree.colorLegend')}
             </h3>
             <div className="grid grid-cols-2 gap-2">
               {(['Folder', 'File', 'Class', 'Function', 'Interface', 'Method'] as NodeLabel[]).map(label => (
@@ -517,8 +519,8 @@ export const FileTreePanel = ({ onFocusNode }: FileTreePanelProps) => {
       {graph && (
         <div className="px-3 py-2 border-t border-border-subtle bg-elevated/50">
           <div className="flex items-center justify-between text-[10px] text-text-muted">
-            <span>{graph.nodes.length} nodes</span>
-            <span>{graph.relationships.length} edges</span>
+            <span>{t('fileTree.nodes', { count: graph.nodes.length })}</span>
+            <span>{t('fileTree.edges', { count: graph.relationships.length })}</span>
           </div>
         </div>
       )}

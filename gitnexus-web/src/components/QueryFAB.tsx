@@ -1,31 +1,33 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Terminal, Play, X, ChevronDown, ChevronUp, Loader2, Sparkles, Table } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAppState } from '../hooks/useAppState';
 
 const EXAMPLE_QUERIES = [
   {
-    label: 'All Functions',
+    labelKey: 'query.allFunctions',
     query: `MATCH (n:Function) RETURN n.id AS id, n.name AS name, n.filePath AS path LIMIT 50`,
   },
   {
-    label: 'All Classes',
+    labelKey: 'query.allClasses',
     query: `MATCH (n:Class) RETURN n.id AS id, n.name AS name, n.filePath AS path LIMIT 50`,
   },
   {
-    label: 'All Interfaces',
+    labelKey: 'query.allInterfaces',
     query: `MATCH (n:Interface) RETURN n.id AS id, n.name AS name, n.filePath AS path LIMIT 50`,
   },
   {
-    label: 'Function Calls',
+    labelKey: 'query.functionCalls',
     query: `MATCH (a:File)-[r:CodeRelation {type: 'CALLS'}]->(b:Function) RETURN a.id AS id, a.name AS caller, b.name AS callee LIMIT 50`,
   },
   {
-    label: 'Import Dependencies',
+    labelKey: 'query.importDependencies',
     query: `MATCH (a:File)-[r:CodeRelation {type: 'IMPORTS'}]->(b:File) RETURN a.id AS id, a.name AS from, b.name AS imports LIMIT 50`,
   },
 ];
 
 export const QueryFAB = () => {
+  const { t } = useTranslation();
   const { setHighlightedNodeIds, setQueryResult, queryResult, clearQueryHighlights, graph, runQuery, isDatabaseReady } = useAppState();
 
   const [isExpanded, setIsExpanded] = useState(false);
@@ -69,13 +71,13 @@ export const QueryFAB = () => {
     if (!query.trim() || isRunning) return;
 
     if (!graph) {
-      setError('No project loaded. Load a project first.');
+      setError(t('query.noProjectLoaded'));
       return;
     }
 
     const ready = await isDatabaseReady();
     if (!ready) {
-      setError('Database not ready. Please wait for loading to complete.');
+      setError(t('query.databaseNotReady'));
       return;
     }
 
@@ -181,7 +183,7 @@ export const QueryFAB = () => {
         "
       >
         <Terminal className="w-4 h-4" />
-        <span>Query</span>
+        <span>{t('query.queryButton')}</span>
         {queryResult && queryResult.nodeIds.length > 0 && (
           <span className="
             px-1.5 py-0.5 ml-1
@@ -213,7 +215,7 @@ export const QueryFAB = () => {
           <div className="w-7 h-7 flex items-center justify-center bg-gradient-to-br from-cyan-500 to-teal-500 rounded-lg">
             <Terminal className="w-4 h-4 text-white" />
           </div>
-          <span className="font-medium text-sm">Cypher Query</span>
+          <span className="font-medium text-sm">{t('query.cypherQuery')}</span>
         </div>
         <button
           onClick={handleClose}
@@ -256,7 +258,7 @@ export const QueryFAB = () => {
               "
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>Examples</span>
+              <span>{t('query.examples')}</span>
               <ChevronDown className={`w-3.5 h-3.5 transition-transform ${showExamples ? 'rotate-180' : ''}`} />
             </button>
 
@@ -270,7 +272,7 @@ export const QueryFAB = () => {
               ">
                 {EXAMPLE_QUERIES.map((example) => (
                   <button
-                    key={example.label}
+                    key={example.labelKey}
                     onClick={() => handleSelectExample(example.query)}
                     className="
                       w-full px-3 py-2 text-left
@@ -279,7 +281,7 @@ export const QueryFAB = () => {
                       transition-colors
                     "
                   >
-                    {example.label}
+                    {t(example.labelKey)}
                   </button>
                 ))}
               </div>
@@ -297,7 +299,7 @@ export const QueryFAB = () => {
                   rounded-md transition-colors
                 "
               >
-                Clear
+                {t('query.clear')}
               </button>
             )}
             <button
@@ -318,7 +320,7 @@ export const QueryFAB = () => {
               ) : (
                 <Play className="w-3.5 h-3.5" />
               )}
-              <span>Run</span>
+              <span>{t('query.run')}</span>
               <kbd className="ml-1 px-1 py-0.5 bg-white/20 rounded text-[10px]">⌘↵</kbd>
             </button>
           </div>
@@ -336,11 +338,11 @@ export const QueryFAB = () => {
           <div className="px-4 py-2.5 bg-cyan-500/5 flex items-center justify-between">
             <div className="flex items-center gap-3 text-xs">
               <span className="text-text-secondary">
-                <span className="text-cyan-400 font-semibold">{queryResult.rows.length}</span> rows
+                <span className="text-cyan-400 font-semibold">{queryResult.rows.length}</span> {t('query.rows', { count: queryResult.rows.length }).replace(`${queryResult.rows.length} `, '')}
               </span>
               {queryResult.nodeIds.length > 0 && (
                 <span className="text-text-secondary">
-                  <span className="text-cyan-400 font-semibold">{queryResult.nodeIds.length}</span> highlighted
+                  <span className="text-cyan-400 font-semibold">{queryResult.nodeIds.length}</span> {t('query.highlighted', { count: queryResult.nodeIds.length }).replace(`${queryResult.nodeIds.length} `, '')}
                 </span>
               )}
               <span className="text-text-muted">
@@ -353,7 +355,7 @@ export const QueryFAB = () => {
                   onClick={clearQueryHighlights}
                   className="text-xs text-text-muted hover:text-text-primary transition-colors"
                 >
-                  Clear
+                  {t('query.clear')}
                 </button>
               )}
               <button
@@ -392,7 +394,7 @@ export const QueryFAB = () => {
               </table>
               {queryResult.rows.length > 50 && (
                 <div className="px-3 py-2 text-xs text-text-muted bg-surface border-t border-border-subtle">
-                  Showing 50 of {queryResult.rows.length} rows
+                  {t('query.showingRows', { shown: 50, total: queryResult.rows.length })}
                 </div>
               )}
             </div>

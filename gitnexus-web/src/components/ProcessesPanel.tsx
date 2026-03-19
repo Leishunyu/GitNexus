@@ -7,11 +7,13 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { GitBranch, Search, Eye, Zap, Home, ChevronDown, ChevronRight, Sparkles, Lightbulb, Layers } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useAppState } from '../hooks/useAppState';
 import { ProcessFlowModal } from './ProcessFlowModal';
 import type { ProcessData, ProcessStep } from '../lib/mermaid-generator';
 
 export const ProcessesPanel = () => {
+    const { t } = useTranslation();
     const { graph, runQuery, setHighlightedNodeIds, highlightedNodeIds } = useAppState();
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedProcess, setSelectedProcess] = useState<ProcessData | null>(null);
@@ -297,9 +299,9 @@ export const ProcessesPanel = () => {
                 <div className="w-14 h-14 mb-4 flex items-center justify-center bg-surface rounded-xl">
                     <GitBranch className="w-7 h-7 text-text-muted" />
                 </div>
-                <h3 className="text-base font-medium text-text-primary mb-2">No Processes Detected</h3>
+                <h3 className="text-base font-medium text-text-primary mb-2">{t('processes.noProcesses')}</h3>
                 <p className="text-sm text-text-secondary max-w-xs">
-                    Processes are execution flows traced from entry points. Load a codebase to see detected processes.
+                    {t('processes.noProcessesDesc')}
                 </p>
             </div>
         );
@@ -316,13 +318,13 @@ export const ProcessesPanel = () => {
                             type="text"
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder="Filter processes..."
+                            placeholder={t('processes.filterPlaceholder')}
                             className="flex-1 bg-transparent border-none outline-none text-sm text-text-primary placeholder:text-text-muted"
                         />
                     </div>
                 </div>
                 <div className="flex items-center gap-2 text-xs text-text-muted">
-                    <span>{totalCount} processes detected</span>
+                    <span>{t('processes.processesDetected', { count: totalCount })}</span>
                 </div>
             </div>
 
@@ -339,8 +341,8 @@ export const ProcessesPanel = () => {
                             <Layers className="w-5 h-5 text-cyan-400" />
                         </div>
                         <div className="flex-1">
-                            <h4 className="text-sm font-medium text-text-primary group-hover:text-cyan-200">Full Process Map</h4>
-                            <p className="text-xs text-text-muted">View combined map of {totalCount} processes</p>
+                            <h4 className="text-sm font-medium text-text-primary group-hover:text-cyan-200">{t('processes.fullProcessMap')}</h4>
+                            <p className="text-xs text-text-muted">{t('processes.viewCombinedMap', { count: totalCount })}</p>
                         </div>
                         {loadingProcess === 'all' ? (
                             <span className="animate-spin mr-1">
@@ -365,7 +367,7 @@ export const ProcessesPanel = () => {
                                 <ChevronRight className="w-4 h-4 text-text-muted" />
                             )}
                             <Zap className="w-4 h-4 text-amber-400" />
-                            <span className="text-sm font-medium text-text-primary">Cross-Community</span>
+                            <span className="text-sm font-medium text-text-primary">{t('processes.crossCommunity')}</span>
                             <span className="ml-auto text-xs text-text-muted bg-surface px-2 py-0.5 rounded-full">
                                 {filteredProcesses.cross.length}
                             </span>
@@ -402,7 +404,7 @@ export const ProcessesPanel = () => {
                                 <ChevronRight className="w-4 h-4 text-text-muted" />
                             )}
                             <Home className="w-4 h-4 text-emerald-400" />
-                            <span className="text-sm font-medium text-text-primary">Intra-Community</span>
+                            <span className="text-sm font-medium text-text-primary">{t('processes.intraCommunity')}</span>
                             <span className="ml-auto text-xs text-text-muted bg-surface px-2 py-0.5 rounded-full">
                                 {filteredProcesses.intra.length}
                             </span>
@@ -449,6 +451,7 @@ interface ProcessItemProps {
 }
 
 const ProcessItem = ({ process, isLoading, isSelected, isFocused, onView, onToggleFocus }: ProcessItemProps) => {
+    const { t } = useTranslation();
     // Determine row styling - focused gets special highlight
     const rowClass = isFocused
         ? 'bg-amber-950/40 border border-amber-500/50 ring-1 ring-amber-400/30'
@@ -462,11 +465,11 @@ const ProcessItem = ({ process, isLoading, isSelected, isFocused, onView, onTogg
             <div className="flex-1 min-w-0">
                 <div className="text-sm text-text-primary truncate">{process.label}</div>
                 <div className="flex items-center gap-2 text-xs text-text-muted">
-                    <span>{process.stepCount} steps</span>
+                    <span>{t('processes.steps', { count: process.stepCount })}</span>
                     {process.clusters.length > 0 && (
                         <>
                             <span>•</span>
-                            <span>{process.clusters.length} clusters</span>
+                            <span>{t('processes.clusters', { count: process.clusters.length })}</span>
                         </>
                     )}
                 </div>
@@ -478,7 +481,7 @@ const ProcessItem = ({ process, isLoading, isSelected, isFocused, onView, onTogg
                     ? 'text-amber-400 hover:text-amber-300 bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/40 animate-pulse opacity-100'
                     : 'text-text-muted hover:text-cyan-400 bg-white/5 hover:bg-cyan-500/20 border border-white/10 hover:border-cyan-400/40 opacity-0 group-hover:opacity-100'
                     }`}
-                title={isFocused ? 'Click to remove highlight from graph' : 'Click to highlight in graph'}
+                title={isFocused ? t('processes.removeHighlight') : t('processes.addHighlight')}
             >
                 <Lightbulb className="w-4 h-4" />
             </button>
@@ -491,16 +494,16 @@ const ProcessItem = ({ process, isLoading, isSelected, isFocused, onView, onTogg
                     }`}
             >
                 {isLoading ? (
-                    <span className="animate-pulse">Loading...</span>
+                    <span className="animate-pulse">{t('processes.loading')}</span>
                 ) : isSelected ? (
                     <>
                         <Eye className="w-3.5 h-3.5" />
-                        Viewing
+                        {t('processes.viewing')}
                     </>
                 ) : (
                     <>
                         <Eye className="w-3.5 h-3.5" />
-                        View
+                        {t('processes.view')}
                     </>
                 )}
             </button>

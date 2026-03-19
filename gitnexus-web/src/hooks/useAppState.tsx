@@ -155,7 +155,7 @@ interface AppState {
 
   // LLM methods
   refreshLLMSettings: () => void;
-  initializeAgent: (overrideProjectName?: string) => Promise<void>;
+  initializeAgent: (overrideProjectName?: string, overrideServerBaseUrl?: string) => Promise<void>;
   sendChatMessage: (message: string) => Promise<void>;
   stopChatResponse: () => void;
   clearChat: () => void;
@@ -565,7 +565,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setLLMSettings(loadSettings());
   }, []);
 
-  const initializeAgent = useCallback(async (overrideProjectName?: string): Promise<void> => {
+  const initializeAgent = useCallback(async (overrideProjectName?: string, overrideServerBaseUrl?: string): Promise<void> => {
     const api = apiRef.current;
     if (!api) {
       setAgentError('Worker not initialized');
@@ -584,12 +584,29 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     try {
       // Use override if provided (for fresh loads), fallback to state (for re-init)
       const effectiveProjectName = overrideProjectName || projectName || 'project';
-      const result = await api.initializeAgent(config, effectiveProjectName);
+      // Prefer explicit override, then state, then null (local mode)
+      const effectiveServerBaseUrl = overrideServerBaseUrl !== undefined ? overrideServerBaseUrl : serverBaseUrl;
+
+      let result: { success: boolean; error?: string };
+
+      if (effectiveServerBaseUrl) {
+        // Server mode: use HTTP-backed agent (no local lbug required)
+        const repoName = effectiveProjectName;
+        const fileContentsEntries: [string, string][] = Array.from(fileContents.entries());
+        // normalizeServerUrl appends /api, but the worker's createHttpExecuteQuery
+        // already appends /api/query itself — so strip the trailing /api here.
+        const workerBaseUrl = effectiveServerBaseUrl.replace(/\/api$/, '');
+        result = await api.initializeBackendAgent(config, workerBaseUrl, repoName, fileContentsEntries, effectiveProjectName);
+      } else {
+        // Local mode: use lbug-backed agent
+        result = await api.initializeAgent(config, effectiveProjectName);
+      }
+
       if (result.success) {
         setIsAgentReady(true);
         setAgentError(null);
         if (import.meta.env.DEV) {
-          console.log('✅ Agent initialized successfully');
+          console.log('✅ Agent initialized successfully (mode:', effectiveServerBaseUrl ? 'backend' : 'local', ')');
         }
       } else {
         setAgentError(result.error ?? 'Failed to initialize agent');
@@ -602,7 +619,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     } finally {
       setIsAgentInitializing(false);
     }
-  }, [projectName]);
+  }, [projectName, serverBaseUrl, fileContents]);
 
   const sendChatMessage = useCallback(async (message: string): Promise<void> => {
     const api = apiRef.current;

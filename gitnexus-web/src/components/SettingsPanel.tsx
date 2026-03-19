@@ -7,6 +7,7 @@ import {
   fetchOpenRouterModels,
 } from '../core/llm/settings-service';
 import type { LLMSettings, LLMProvider } from '../core/llm/types';
+import { useTranslation } from 'react-i18next';
 
 interface SettingsPanelProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ interface OpenRouterModelComboboxProps {
 }
 
 const OpenRouterModelCombobox = ({ value, onChange, models, isLoading, onLoadModels }: OpenRouterModelComboboxProps) => {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
@@ -122,13 +124,13 @@ const OpenRouterModelCombobox = ({ value, onChange, models, isLoading, onLoadMod
             value={searchTerm}
             onChange={handleInputChange}
             onKeyDown={handleKeyDown}
-            placeholder="Search or type model ID..."
+            placeholder={t('settings.searchOrType')}
             className="flex-1 bg-transparent text-text-primary placeholder:text-text-muted outline-none font-mono text-sm"
             onClick={e => e.stopPropagation()}
           />
         ) : (
           <span className={`flex-1 font-mono text-sm truncate ${value ? 'text-text-primary' : 'text-text-muted'}`}>
-            {displayValue || 'Select or type a model...'}
+            {displayValue || t('settings.selectOrType')}
           </span>
         )}
         <div className="flex items-center gap-1">
@@ -143,20 +145,20 @@ const OpenRouterModelCombobox = ({ value, onChange, models, isLoading, onLoadMod
           {isLoading ? (
             <div className="px-4 py-6 text-center text-text-muted text-sm flex items-center justify-center gap-2">
               <Loader2 className="w-4 h-4 animate-spin" />
-              Loading models...
+              {t('settings.loadingModels')}
             </div>
           ) : filteredModels.length === 0 ? (
             <div className="px-4 py-4 text-center">
               {models.length === 0 ? (
                 <div className="text-text-muted text-sm">
                   <Search className="w-5 h-5 mx-auto mb-2 opacity-50" />
-                  <p>Type a model ID or press Enter</p>
-                  <p className="text-xs mt-1">e.g. openai/gpt-4o</p>
+                  <p>{t('settings.typeModelId')}</p>
+                  <p className="text-xs mt-1">{t('settings.modelIdExample')}</p>
                 </div>
               ) : (
                 <div className="text-text-muted text-sm">
-                  <p>No models match "{searchTerm}"</p>
-                  <p className="text-xs mt-1">Press Enter to use as custom ID</p>
+                  <p>{t('settings.noModelsMatch', { term: searchTerm })}</p>
+                  <p className="text-xs mt-1">{t('settings.pressEnterCustom')}</p>
                 </div>
               )}
             </div>
@@ -175,7 +177,7 @@ const OpenRouterModelCombobox = ({ value, onChange, models, isLoading, onLoadMod
               ))}
               {filteredModels.length > 50 && (
                 <div className="px-4 py-2 text-xs text-text-muted text-center border-t border-border-subtle">
-                  +{filteredModels.length - 50} more • Refine your search
+                  {t('settings.moreModels', { count: filteredModels.length - 50 })}
                 </div>
               )}
             </div>
@@ -213,6 +215,7 @@ const checkOllamaStatus = async (baseUrl: string): Promise<{ ok: boolean; error:
 };
 
 export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, isBackendConnected, onBackendUrlChange }: SettingsPanelProps) => {
+  const { t } = useTranslation();
   const [settings, setSettings] = useState<LLMSettings>(loadSettings);
   const [showApiKey, setShowApiKey] = useState<Record<string, boolean>>({});
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle');
@@ -301,8 +304,8 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
               <Brain className="w-5 h-5 text-accent" />
             </div>
             <div>
-              <h2 className="text-lg font-semibold text-text-primary">AI Settings</h2>
-              <p className="text-xs text-text-muted">Configure your LLM provider</p>
+              <h2 className="text-lg font-semibold text-text-primary">{t('settings.title')}</h2>
+              <p className="text-xs text-text-muted">{t('settings.subtitle')}</p>
             </div>
           </div>
           <button
@@ -319,15 +322,15 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
           {backendUrl !== undefined && onBackendUrlChange && (
             <div className="space-y-3">
               <label className="block text-sm font-medium text-text-secondary">
-                Local Server
+                {t('settings.localServer')}
               </label>
               <div className="space-y-2">
                 <div className="flex items-center gap-2 mb-2">
                   <Server className="w-4 h-4 text-text-muted" />
-                  <span className="text-sm text-text-secondary">Backend URL</span>
+                  <span className="text-sm text-text-secondary">{t('settings.backendUrl')}</span>
                   <span className={`w-2 h-2 rounded-full ${isBackendConnected ? 'bg-green-400' : 'bg-red-400'}`} />
                   <span className="text-xs text-text-muted">
-                    {isBackendConnected ? 'Connected' : 'Not connected'}
+                    {isBackendConnected ? t('settings.connected') : t('settings.notConnected')}
                   </span>
                 </div>
                 <input
@@ -338,7 +341,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
                   className="w-full px-4 py-3 bg-elevated border border-border-subtle rounded-xl text-text-primary placeholder:text-text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all font-mono text-sm"
                 />
                 <p className="text-xs text-text-muted">
-                  Run <code className="px-1 py-0.5 bg-elevated rounded">gitnexus serve</code> to start the local server
+                  {t('settings.runServe')} <code className="px-1 py-0.5 bg-elevated rounded">{t('settings.serveCommand')}</code> {t('settings.toStartServer')}
                 </p>
               </div>
             </div>
@@ -347,7 +350,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
           {/* Provider Selection */}
           <div className="space-y-3">
             <label className="block text-sm font-medium text-text-secondary">
-              Provider
+              {t('settings.provider')}
             </label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {providers.map(provider => (
@@ -380,7 +383,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-text-secondary">
                   <Key className="w-4 h-4" />
-                  API Key
+                  {t('settings.apiKey')}
                 </label>
                 <div className="relative">
                   <input
@@ -390,7 +393,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
                       ...prev,
                       openai: { ...prev.openai!, apiKey: e.target.value }
                     }))}
-                    placeholder="Enter your OpenAI API key"
+                    placeholder={t('settings.enterApiKey', { provider: 'OpenAI' })}
                     className="w-full px-4 py-3 pr-12 bg-elevated border border-border-subtle rounded-xl text-text-primary placeholder:text-text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all"
                   />
                   <button
@@ -402,20 +405,20 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
                   </button>
                 </div>
                 <p className="text-xs text-text-muted">
-                  Get your API key from{' '}
+                  {t('settings.getApiKeyFrom')}{' '}
                   <a
                     href="https://platform.openai.com/api-keys"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-accent hover:underline"
                   >
-                    OpenAI Platform
+                    {t('settings.openaiPlatform')}
                   </a>
                 </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-text-secondary">Model</label>
+                <label className="text-sm font-medium text-text-secondary">{t('settings.model')}</label>
                 <input
                   type="text"
                   value={settings.openai?.model ?? 'gpt-5.2-chat'}
@@ -431,7 +434,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-text-secondary">
                   <Server className="w-4 h-4" />
-                  Base URL <span className="text-text-muted font-normal">(optional)</span>
+                  {t('settings.baseUrlOptional')}
                 </label>
                 <input
                   type="url"
@@ -444,7 +447,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
                   className="w-full px-4 py-3 bg-elevated border border-border-subtle rounded-xl text-text-primary placeholder:text-text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all"
                 />
                 <p className="text-xs text-text-muted">
-                  Leave empty to use the default OpenAI API. Set a custom URL for proxies or compatible APIs.
+                  {t('settings.baseUrlHint')}
                 </p>
               </div>
             </div>
@@ -456,7 +459,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-text-secondary">
                   <Key className="w-4 h-4" />
-                  API Key
+                  {t('settings.apiKey')}
                 </label>
                 <div className="relative">
                   <input
@@ -466,7 +469,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
                       ...prev,
                       gemini: { ...prev.gemini!, apiKey: e.target.value }
                     }))}
-                    placeholder="Enter your Google AI API key"
+                    placeholder={t('settings.enterApiKey', { provider: 'Google AI' })}
                     className="w-full px-4 py-3 pr-12 bg-elevated border border-border-subtle rounded-xl text-text-primary placeholder:text-text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all"
                   />
                   <button
@@ -478,20 +481,20 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
                   </button>
                 </div>
                 <p className="text-xs text-text-muted">
-                  Get your API key from{' '}
+                  {t('settings.getApiKeyFrom')}{' '}
                   <a
                     href="https://aistudio.google.com/app/apikey"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-accent hover:underline"
                   >
-                    Google AI Studio
+                    {t('settings.googleAIStudio')}
                   </a>
                 </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-text-secondary">Model</label>
+                <label className="text-sm font-medium text-text-secondary">{t('settings.model')}</label>
                 <input
                   type="text"
                   value={settings.gemini?.model ?? 'gemini-2.0-flash'}
@@ -512,7 +515,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-text-secondary">
                   <Key className="w-4 h-4" />
-                  API Key
+                  {t('settings.apiKey')}
                 </label>
                 <div className="relative">
                   <input
@@ -522,7 +525,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
                       ...prev,
                       anthropic: { ...prev.anthropic!, apiKey: e.target.value }
                     }))}
-                    placeholder="Enter your Anthropic API key"
+                    placeholder={t('settings.enterApiKey', { provider: 'Anthropic' })}
                     className="w-full px-4 py-3 pr-12 bg-elevated border border-border-subtle rounded-xl text-text-primary placeholder:text-text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all"
                   />
                   <button
@@ -534,20 +537,20 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
                   </button>
                 </div>
                 <p className="text-xs text-text-muted">
-                  Get your API key from{' '}
+                  {t('settings.getApiKeyFrom')}{' '}
                   <a
                     href="https://console.anthropic.com/settings/keys"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-accent hover:underline"
                   >
-                    Anthropic Console
+                    {t('settings.anthropicConsole')}
                   </a>
                 </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-text-secondary">Model</label>
+                <label className="text-sm font-medium text-text-secondary">{t('settings.model')}</label>
                 <input
                   type="text"
                   value={settings.anthropic?.model ?? 'claude-sonnet-4-20250514'}
@@ -568,7 +571,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-text-secondary">
                   <Key className="w-4 h-4" />
-                  API Key
+                  {t('settings.apiKey')}
                 </label>
                 <div className="relative">
                   <input
@@ -578,7 +581,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
                       ...prev,
                       azureOpenAI: { ...prev.azureOpenAI!, apiKey: e.target.value }
                     }))}
-                    placeholder="Enter your Azure OpenAI API key"
+                    placeholder={t('settings.enterApiKey', { provider: 'Azure OpenAI' })}
                     className="w-full px-4 py-3 pr-12 bg-elevated border border-border-subtle rounded-xl text-text-primary placeholder:text-text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all"
                   />
                   <button
@@ -594,7 +597,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-text-secondary">
                   <Server className="w-4 h-4" />
-                  Endpoint
+                  {t('settings.endpoint')}
                 </label>
                 <input
                   type="url"
@@ -609,7 +612,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-text-secondary">Deployment Name</label>
+                <label className="text-sm font-medium text-text-secondary">{t('settings.deploymentName')}</label>
                 <input
                   type="text"
                   value={settings.azureOpenAI?.deploymentName ?? ''}
@@ -624,7 +627,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-text-secondary">Model</label>
+                  <label className="text-sm font-medium text-text-secondary">{t('settings.model')}</label>
                   <input
                     type="text"
                     value={settings.azureOpenAI?.model ?? 'gpt-4o'}
@@ -638,7 +641,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-text-secondary">API Version</label>
+                  <label className="text-sm font-medium text-text-secondary">{t('settings.apiVersion')}</label>
                   <input
                     type="text"
                     value={settings.azureOpenAI?.apiVersion ?? '2024-08-01-preview'}
@@ -653,14 +656,14 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
               </div>
 
               <p className="text-xs text-text-muted">
-                Configure your Azure OpenAI service in the{' '}
+                {t('settings.configureAzure')}{' '}
                 <a
                   href="https://portal.azure.com/#view/Microsoft_Azure_ProjectOxford/CognitiveServicesHub/~/OpenAI"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-accent hover:underline"
                 >
-                  Azure Portal
+                  {t('settings.azurePortal')}
                 </a>
               </p>
             </div>
@@ -672,25 +675,25 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
               {/* How to run Ollama */}
               <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl">
                 <p className="text-xs text-amber-300 leading-relaxed">
-                  <span className="font-medium">📋 Quick Start:</span> Install Ollama from{' '}
+                  <span className="font-medium">{t('settings.ollamaQuickStart')}</span> {t('settings.ollamaInstall')}{' '}
                   <a
                     href="https://ollama.ai"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-accent hover:underline"
                   >
-                    ollama.ai
-                  </a>, then run:
+                    {t('settings.ollamaAi')}
+                  </a>{t('settings.ollamaThenRun')}
                 </p>
                 <code className="block mt-2 px-3 py-2 bg-black/30 rounded-lg text-amber-200 font-mono text-sm">
-                  ollama serve
+                  {t('settings.ollamaServe')}
                 </code>
               </div>
 
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-text-secondary">
                   <Server className="w-4 h-4" />
-                  Base URL
+                  {t('settings.baseUrl')}
                 </label>
                 <div className="flex gap-2">
                   <input
@@ -708,18 +711,18 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
                     onClick={() => checkOllamaConnection(settings.ollama?.baseUrl ?? 'http://localhost:11434')}
                     disabled={isCheckingOllama}
                     className="px-3 py-3 bg-elevated border border-border-subtle rounded-xl text-text-secondary hover:text-text-primary hover:border-accent/50 transition-colors disabled:opacity-50"
-                    title="Check connection"
+                    title={t('settings.checkConnection')}
                   >
                     <RefreshCw className={`w-4 h-4 ${isCheckingOllama ? 'animate-spin' : ''}`} />
                   </button>
                 </div>
                 <p className="text-xs text-text-muted">
-                  Default port is <code className="px-1 py-0.5 bg-elevated rounded">11434</code>.
+                  {t('settings.defaultPort')} <code className="px-1 py-0.5 bg-elevated rounded">11434</code>.
                 </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-text-secondary">Model</label>
+                <label className="text-sm font-medium text-text-secondary">{t('settings.model')}</label>
 
                 {ollamaError && !isCheckingOllama && (
                   <div className="p-2 bg-red-500/10 border border-red-500/30 rounded-lg">
@@ -741,7 +744,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
                   className="w-full px-4 py-3 bg-elevated border border-border-subtle rounded-xl text-text-primary placeholder:text-text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all font-mono text-sm"
                 />
                 <p className="text-xs text-text-muted">
-                  Pull a model with <code className="px-1 py-0.5 bg-elevated rounded">ollama pull llama3.2</code>
+                  {t('settings.pullModel')} <code className="px-1 py-0.5 bg-elevated rounded">{t('settings.pullModelExample')}</code>
                 </p>
               </div>
             </div>
@@ -753,7 +756,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
               <div className="space-y-2">
                 <label className="flex items-center gap-2 text-sm font-medium text-text-secondary">
                   <Key className="w-4 h-4" />
-                  API Key
+                  {t('settings.apiKey')}
                 </label>
                 <div className="relative">
                   <input
@@ -763,7 +766,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
                       ...prev,
                       openrouter: { ...prev.openrouter!, apiKey: e.target.value }
                     }))}
-                    placeholder="Enter your OpenRouter API key"
+                    placeholder={t('settings.enterApiKey', { provider: 'OpenRouter' })}
                     className="w-full px-4 py-3 pr-12 bg-elevated border border-border-subtle rounded-xl text-text-primary placeholder:text-text-muted focus:border-accent focus:ring-2 focus:ring-accent/20 outline-none transition-all"
                   />
                   <button
@@ -775,20 +778,20 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
                   </button>
                 </div>
                 <p className="text-xs text-text-muted">
-                  Get your API key from{' '}
+                  {t('settings.getApiKeyFrom')}{' '}
                   <a
                     href="https://openrouter.ai/keys"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-accent hover:underline"
                   >
-                    OpenRouter Keys
+                    {t('settings.openrouterKeys')}
                   </a>
                 </p>
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-text-secondary">Model</label>
+                <label className="text-sm font-medium text-text-secondary">{t('settings.model')}</label>
                 <OpenRouterModelCombobox
                   value={settings.openrouter?.model ?? ''}
                   onChange={(model) => setSettings(prev => ({
@@ -800,14 +803,14 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
                   onLoadModels={loadOpenRouterModels}
                 />
                 <p className="text-xs text-text-muted">
-                  Browse all models at{' '}
+                  {t('settings.browseModels')}{' '}
                   <a
                     href="https://openrouter.ai/models"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-accent hover:underline"
                   >
-                    OpenRouter Models
+                    {t('settings.openrouterModels')}
                   </a>
                 </p>
               </div>
@@ -823,8 +826,7 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
                 🔒
               </div>
               <div className="text-xs text-text-muted leading-relaxed">
-                <span className="text-text-secondary font-medium">Privacy:</span> Your API keys are stored only in your browser's local storage.
-                They're sent directly to the LLM provider when you chat. Your code never leaves your machine.
+                <span className="text-text-secondary font-medium">{t('settings.privacyTitle')}</span> {t('settings.privacyText')}
               </div>
             </div>
           </div>
@@ -836,13 +838,13 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
             {saveStatus === 'saved' && (
               <span className="flex items-center gap-1.5 text-green-400 animate-fade-in">
                 <Check className="w-4 h-4" />
-                Settings saved
+                {t('settings.settingsSaved')}
               </span>
             )}
             {saveStatus === 'error' && (
               <span className="flex items-center gap-1.5 text-red-400 animate-fade-in">
                 <AlertCircle className="w-4 h-4" />
-                Failed to save
+                {t('settings.failedToSave')}
               </span>
             )}
           </div>
@@ -851,13 +853,13 @@ export const SettingsPanel = ({ isOpen, onClose, onSettingsSaved, backendUrl, is
               onClick={onClose}
               className="px-4 py-2 text-sm text-text-secondary hover:text-text-primary transition-colors"
             >
-              Cancel
+              {t('settings.cancel')}
             </button>
             <button
               onClick={handleSave}
               className="px-5 py-2 bg-accent text-white text-sm font-medium rounded-lg hover:bg-accent-dim transition-colors"
             >
-              Save Settings
+              {t('settings.saveSettings')}
             </button>
           </div>
         </div>

@@ -4,6 +4,7 @@ import type { RepoSummary } from '../services/server-connection';
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { GraphNode } from '../core/graph/types';
 import { EmbeddingStatus } from './EmbeddingStatus';
+import { useTranslation } from 'react-i18next';
 
 // Color mapping for node types in search results
 const NODE_TYPE_COLORS: Record<string, string> = {
@@ -25,6 +26,7 @@ interface HeaderProps {
 }
 
 export const Header = ({ onFocusNode, availableRepos = [], onSwitchRepo }: HeaderProps) => {
+  const { t, i18n } = useTranslation();
   const {
     projectName,
     graph,
@@ -33,6 +35,11 @@ export const Header = ({ onFocusNode, availableRepos = [], onSwitchRepo }: Heade
     rightPanelTab,
     setSettingsPanelOpen,
   } = useAppState();
+
+  const toggleLanguage = () => {
+    const newLang = i18n.language === 'zh' ? 'en' : 'zh';
+    i18n.changeLanguage(newLang);
+  };
   const [isRepoDropdownOpen, setIsRepoDropdownOpen] = useState(false);
   const repoDropdownRef = useRef<HTMLDivElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -121,7 +128,7 @@ export const Header = ({ onFocusNode, availableRepos = [], onSwitchRepo }: Heade
           <div className="w-7 h-7 flex items-center justify-center bg-gradient-to-br from-accent to-node-interface rounded-md shadow-glow text-white text-sm font-bold">
             ◇
           </div>
-          <span className="font-semibold text-[15px] tracking-tight">GitNexus</span>
+          <span className="font-semibold text-[15px] tracking-tight">{t('header.gitNexus')}</span>
         </div>
 
         {/* Project badge / Repo selector dropdown */}
@@ -160,7 +167,7 @@ export const Header = ({ onFocusNode, availableRepos = [], onSwitchRepo }: Heade
                           {repo.name}
                         </div>
                         <div className="text-xs text-text-muted mt-0.5">
-                          {repo.stats?.nodes ?? '?'} nodes &middot; {repo.stats?.files ?? '?'} files
+                          {t('backendRepo.nodes', { count: repo.stats?.nodes ?? '?' })} &middot; {t('backendRepo.files', { count: repo.stats?.files ?? '?' })}
                         </div>
                       </div>
                     </button>
@@ -179,7 +186,7 @@ export const Header = ({ onFocusNode, availableRepos = [], onSwitchRepo }: Heade
           <input
             ref={inputRef}
             type="text"
-            placeholder="Search nodes..."
+            placeholder={t('header.searchPlaceholder')}
             value={searchQuery}
             onChange={(e) => {
               setSearchQuery(e.target.value);
@@ -200,7 +207,7 @@ export const Header = ({ onFocusNode, availableRepos = [], onSwitchRepo }: Heade
           <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-border-subtle rounded-lg shadow-xl overflow-hidden z-50">
             {searchResults.length === 0 ? (
               <div className="px-4 py-3 text-sm text-text-muted">
-                No nodes found for "{searchQuery}"
+                {t('header.noNodesFound', { query: searchQuery })}
               </div>
             ) : (
               <div className="max-h-80 overflow-y-auto">
@@ -244,7 +251,7 @@ export const Header = ({ onFocusNode, availableRepos = [], onSwitchRepo }: Heade
           className="flex items-center gap-2 px-3.5 py-2 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 rounded-lg text-white text-sm font-medium shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 group"
         >
           <Github className="w-4 h-4" />
-          <span className="hidden sm:inline">Star if cool</span>
+          <span className="hidden sm:inline">{t('header.starIfCool')}</span>
           <Star className="w-3.5 h-3.5 group-hover:fill-yellow-300 group-hover:text-yellow-300 transition-all" />
           <span className="hidden sm:inline">✨</span>
         </a>
@@ -252,19 +259,28 @@ export const Header = ({ onFocusNode, availableRepos = [], onSwitchRepo }: Heade
         {/* Stats */}
         {graph && (
           <div className="flex items-center gap-4 mr-2 text-xs text-text-muted">
-            <span>{nodeCount} nodes</span>
-            <span>{edgeCount} edges</span>
+            <span>{t('header.nodes', { count: nodeCount })}</span>
+            <span>{t('header.edges', { count: edgeCount })}</span>
           </div>
         )}
 
         {/* Embedding Status */}
         <EmbeddingStatus />
 
+        {/* Language Toggle */}
+        <button
+          onClick={toggleLanguage}
+          className="text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20 text-gray-300 transition-colors"
+          title={i18n.language === 'zh' ? 'Switch to English' : '切换到中文'}
+        >
+          {i18n.language === 'zh' ? 'EN' : '中文'}
+        </button>
+
         {/* Icon buttons */}
         <button
           onClick={() => setSettingsPanelOpen(true)}
           className="w-9 h-9 flex items-center justify-center rounded-md text-text-secondary hover:bg-hover hover:text-text-primary transition-colors"
-          title="AI Settings"
+          title={t('header.aiSettings')}
         >
           <Settings className="w-[18px] h-[18px]" />
         </button>
@@ -284,7 +300,7 @@ export const Header = ({ onFocusNode, availableRepos = [], onSwitchRepo }: Heade
           `}
         >
           <Sparkles className="w-4 h-4" />
-          <span>Nexus AI</span>
+          <span>{t('header.nexusAI')}</span>
         </button>
       </div>
     </header>

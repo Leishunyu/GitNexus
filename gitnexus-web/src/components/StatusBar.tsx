@@ -1,7 +1,9 @@
 import { Heart } from 'lucide-react';
 import { useAppState } from '../hooks/useAppState';
+import { useTranslation } from 'react-i18next';
 
 export const StatusBar = () => {
+  const { t } = useTranslation();
   const { graph, progress } = useAppState();
 
   const nodeCount = graph?.nodes.length ?? 0;
@@ -40,7 +42,7 @@ export const StatusBar = () => {
         ) : (
           <div className="flex items-center gap-1.5">
             <span className="w-1.5 h-1.5 bg-node-function rounded-full" />
-            <span>Ready</span>
+            <span>{t('statusBar.ready')}</span>
           </div>
         )}
       </div>
@@ -53,9 +55,9 @@ export const StatusBar = () => {
         className="group flex items-center gap-2 px-3 py-1 rounded-full bg-pink-500/10 border border-pink-500/20 hover:bg-pink-500/20 hover:border-pink-500/40 hover:scale-[1.02] transition-all duration-200 cursor-pointer"
       >
         <Heart className="w-3.5 h-3.5 text-pink-500 fill-pink-500/40 group-hover:fill-pink-500 group-hover:scale-110 transition-all duration-200 animate-pulse" />
-        <span className="text-[11px] font-medium text-pink-400 group-hover:text-pink-300 transition-colors">Sponsor</span>
+        <span className="text-[11px] font-medium text-pink-400 group-hover:text-pink-300 transition-colors">{t('statusBar.sponsor')}</span>
         <span className="text-[10px] text-pink-300/50 group-hover:text-pink-300/80 italic hidden md:inline transition-colors">
-          need to buy some API credits to run SWE-bench 😅
+          {t('statusBar.sponsorNote')}
         </span>
       </a>
 
@@ -63,9 +65,9 @@ export const StatusBar = () => {
       <div className="flex items-center gap-3">
         {graph && (
           <>
-            <span>{nodeCount} nodes</span>
+            <span>{t('statusBar.nodes', { count: nodeCount })}</span>
             <span className="text-border-default">•</span>
-            <span>{edgeCount} edges</span>
+            <span>{t('statusBar.edges', { count: edgeCount })}</span>
             {primaryLanguage && (
               <>
                 <span className="text-border-default">•</span>
